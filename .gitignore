@@ -3,3 +3,6 @@
 coverage.html
 vendor
 .DS_Store
+.qoder
+.claude
+.env
