@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	grpcAddress := os.Getenv("GRPC_ADDRESS")
 	if grpcAddress == "" {
 		grpcAddress = "localhost:8080"
@@ -17,7 +21,7 @@ func main() {
 
 	bearerToken := os.Getenv("BEARER_TOKEN")
 	if bearerToken == "" {
-		fmt.Println("warning: BEARER_TOKEN environment variable not set")
+		log.Warn().Msg("BEARER_TOKEN environment variable not set")
 	}
 
 	tlsConfig := client.TlsConfig{}
@@ -26,19 +30,19 @@ func main() {
 		WithTLSConfig(tlsConfig).
 		Build(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to build DAML client")
 	}
 
 	configs, err := cl.IdentityProviderMng.ListIdentityProviderConfigs(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to list identity provider configs")
 	}
 	for _, cfg := range configs {
-		println(fmt.Sprintf("identity provider config: %+v", cfg))
+		log.Info().Interface("config", cfg).Msg("identity provider config")
 	}
 
 	newConfig := &model.IdentityProviderConfig{
-		IdentityProviderID: fmt.Sprintf("test-provider-%d", os.Getpid()),
+		IdentityProviderID: "test-provider-" + os.Getenv("USER"),
 		IsDeactivated:      false,
 		Issuer:             "https://example.com",
 		JwksURL:            "https://example.com/.well-known/jwks.json",
@@ -47,17 +51,17 @@ func main() {
 
 	createdConfig, err := cl.IdentityProviderMng.CreateIdentityProviderConfig(context.Background(), newConfig)
 	if err != nil {
-		fmt.Printf("create identity provider error: %v\n", err)
+		log.Error().Err(err).Msg("create identity provider error")
 	} else {
-		println(fmt.Sprintf("created identity provider: %+v", createdConfig))
+		log.Info().Interface("config", createdConfig).Msg("created identity provider")
 	}
 
 	if createdConfig != nil {
 		retrievedConfig, err := cl.IdentityProviderMng.GetIdentityProviderConfig(context.Background(), createdConfig.IdentityProviderID)
 		if err != nil {
-			panic(err)
+			log.Fatal().Err(err).Msg("failed to get identity provider config")
 		}
-		println(fmt.Sprintf("retrieved identity provider: %+v", retrievedConfig))
+		log.Info().Interface("config", retrievedConfig).Msg("retrieved identity provider")
 
 		updatedConfig := &model.IdentityProviderConfig{
 			IdentityProviderID: createdConfig.IdentityProviderID,
@@ -69,25 +73,25 @@ func main() {
 
 		finalConfig, err := cl.IdentityProviderMng.UpdateIdentityProviderConfig(context.Background(), updatedConfig, []string{"issuer", "jwks_url", "audience"})
 		if err != nil {
-			fmt.Printf("update identity provider error: %v\n", err)
+			log.Error().Err(err).Msg("update identity provider error")
 		} else {
-			println(fmt.Sprintf("updated identity provider: %+v", finalConfig))
+			log.Info().Interface("config", finalConfig).Msg("updated identity provider")
 		}
 
 		err = cl.IdentityProviderMng.DeleteIdentityProviderConfig(context.Background(), createdConfig.IdentityProviderID)
 		if err != nil {
-			fmt.Printf("delete identity provider error: %v\n", err)
+			log.Error().Err(err).Msg("delete identity provider error")
 		} else {
-			fmt.Println("identity provider deleted successfully")
+			log.Info().Msg("identity provider deleted successfully")
 		}
 	}
 
 	finalConfigs, err := cl.IdentityProviderMng.ListIdentityProviderConfigs(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to list final identity provider configs")
 	}
-	fmt.Println("final identity provider configs:")
+	log.Info().Msg("final identity provider configs:")
 	for _, cfg := range finalConfigs {
-		println(fmt.Sprintf("  - %+v", cfg))
+		log.Info().Interface("config", cfg).Msg("identity provider config")
 	}
 }

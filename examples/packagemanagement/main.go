@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/noders-team/go-daml/pkg/client"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	grpcAddress := os.Getenv("GRPC_ADDRESS")
 	if grpcAddress == "" {
 		grpcAddress = "localhost:8080"
@@ -17,7 +21,7 @@ func main() {
 
 	bearerToken := os.Getenv("BEARER_TOKEN")
 	if bearerToken == "" {
-		fmt.Println("Warning: BEARER_TOKEN environment variable not set")
+		log.Warn().Msg("BEARER_TOKEN environment variable not set")
 	}
 
 	tlsConfig := client.TlsConfig{}
@@ -26,58 +30,62 @@ func main() {
 		WithTLSConfig(tlsConfig).
 		Build(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to build DAML client")
 	}
 
 	packages, err := cl.PackageMng.ListKnownPackages(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to list packages")
 	}
 
-	fmt.Println("known packages:")
+	log.Info().Msg("known packages:")
 	for _, pkg := range packages {
-		println(fmt.Sprintf("  Package ID: %s", pkg.PackageID))
-		println(fmt.Sprintf("  Name: %s", pkg.Name))
-		println(fmt.Sprintf("  Version: %s", pkg.Version))
-		println(fmt.Sprintf("  Size: %d bytes", pkg.PackageSize))
-		if pkg.KnownSince != nil {
-			println(fmt.Sprintf("  Known Since: %s", pkg.KnownSince.Format(time.RFC3339)))
-		}
-		println("")
+		log.Info().
+			Str("packageID", pkg.PackageID).
+			Str("name", pkg.Name).
+			Str("version", pkg.Version).
+			Uint64("size", pkg.PackageSize).
+			Time("knownSince", func() time.Time {
+				if pkg.KnownSince != nil {
+					return *pkg.KnownSince
+				}
+				return time.Time{}
+			}()).
+			Msg("package details")
 	}
 
-	darFilePath := "./examples/packagemanagement/test.dar"
-	fmt.Printf("\ntesting DAR file upload from: %s\n", darFilePath)
+	darFilePath := "./examples/packagemanagement/rental-0_1_0-sdk_1_18_1-lf_1_14.dar"
+	log.Info().Str("path", darFilePath).Msg("testing DAR file upload")
 
 	darContent, err := os.ReadFile(darFilePath)
 	if err != nil {
-		fmt.Printf("failed to read DAR file: %v\n", err)
+		log.Error().Err(err).Msg("failed to read DAR file")
 	} else {
-		fmt.Printf("dar file size: %d bytes\n", len(darContent))
+		log.Info().Int("size", len(darContent)).Msg("DAR file size")
 
-		submissionID := fmt.Sprintf("validate-%d", time.Now().Unix())
-		fmt.Printf("validating DAR file (submission ID: %s)...\n", submissionID)
+		submissionID := "validate-" + time.Now().Format("20060102150405")
+		log.Info().Str("submissionID", submissionID).Msg("validating DAR file")
 
 		err = cl.PackageMng.ValidateDarFile(context.Background(), darContent, submissionID)
 		if err != nil {
-			fmt.Printf("dar validation failed: %v\n", err)
+			log.Error().Err(err).Msg("DAR validation failed")
 		} else {
-			fmt.Println("dar validation successful!")
+			log.Info().Msg("DAR validation successful!")
 
-			uploadSubmissionID := fmt.Sprintf("upload-%d", time.Now().Unix())
-			fmt.Printf("uploading DAR file (submission ID: %s)...\n", uploadSubmissionID)
+			uploadSubmissionID := "upload-" + time.Now().Format("20060102150405")
+			log.Info().Str("submissionID", uploadSubmissionID).Msg("uploading DAR file")
 
 			err = cl.PackageMng.UploadDarFile(context.Background(), darContent, uploadSubmissionID)
 			if err != nil {
-				fmt.Printf("dar upload failed: %v\n", err)
+				log.Error().Err(err).Msg("DAR upload failed")
 			} else {
-				fmt.Println("dar upload successful!")
+				log.Info().Msg("DAR upload successful!")
 
 				updatedPackages, err := cl.PackageMng.ListKnownPackages(context.Background())
 				if err != nil {
-					fmt.Printf("failed to list packages after upload: %v\n", err)
+					log.Error().Err(err).Msg("failed to list packages after upload")
 				} else {
-					fmt.Printf("total packages after upload: %d\n", len(updatedPackages))
+					log.Info().Int("count", len(updatedPackages)).Msg("total packages after upload")
 				}
 			}
 		}

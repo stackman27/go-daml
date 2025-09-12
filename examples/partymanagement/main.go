@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	grpcAddress := os.Getenv("GRPC_ADDRESS")
 	if grpcAddress == "" {
 		grpcAddress = "localhost:8080"
@@ -17,7 +21,7 @@ func main() {
 
 	bearerToken := os.Getenv("BEARER_TOKEN")
 	if bearerToken == "" {
-		fmt.Println("Warning: BEARER_TOKEN environment variable not set")
+		log.Warn().Msg("BEARER_TOKEN environment variable not set")
 	}
 
 	tlsConfig := client.TlsConfig{}
@@ -26,39 +30,40 @@ func main() {
 		WithTLSConfig(tlsConfig).
 		Build(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to build DAML client")
 	}
 
 	participantID, err := cl.PartyMng.GetParticipantID(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to get participant ID")
 	}
-	println(fmt.Sprintf("participant ID: %s", participantID))
+	log.Info().Str("participantID", participantID).Msg("participant ID")
 
 	response, err := cl.PartyMng.ListKnownParties(context.Background(), "", 10, "")
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to list known parties")
 	}
 	for _, d := range response.PartyDetails {
-		println(fmt.Sprintf("received party details: %+v", d))
+		log.Info().Interface("party", d).Msg("received party details")
 	}
 
 	allocDetails, err := cl.PartyMng.GetParties(context.Background(), []string{"participant_admin"}, "")
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to get parties")
 	}
 	for _, ad := range allocDetails {
-		println(fmt.Sprintf("party details: %+v", ad))
+		log.Info().Interface("party", ad).Msg("party details")
 	}
 
-	newParty, err := cl.PartyMng.AllocateParty(context.Background(), fmt.Sprintf("test_party_%d", os.Getpid()), map[string]string{
+	newPartyHint := "test_party_" + os.Getenv("USER") + "_" + os.Getenv("HOSTNAME")
+	newParty, err := cl.PartyMng.AllocateParty(context.Background(), newPartyHint, map[string]string{
 		"description": "New test party",
 		"type":        "testing",
 	}, "")
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to allocate party")
 	}
-	println(fmt.Sprintf("new party allocated: %+v", newParty))
+	log.Info().Interface("party", newParty).Msg("new party allocated")
 
 	updatedParty, err := cl.PartyMng.UpdatePartyDetails(context.Background(), &model.PartyDetails{
 		Party:   newParty.Party,
@@ -72,21 +77,21 @@ func main() {
 		Paths: []string{"local_metadata"},
 	})
 	if err != nil {
-		fmt.Printf("update party details error: %v\n", err)
+		log.Error().Err(err).Msg("update party details error")
 	} else {
-		println(fmt.Sprintf("updated party: %+v", updatedParty))
+		log.Info().Interface("party", updatedParty).Msg("updated party")
 	}
 
 	err = cl.PartyMng.UpdatePartyIdentityProviderID(context.Background(), "participant_admin", "", "new-provider-id")
 	if err != nil {
-		fmt.Printf("update identity provider error (expected if not supported): %v\n", err)
+		log.Warn().Err(err).Msg("update identity provider error (expected if not supported)")
 	}
 
 	updatedResponse, err := cl.PartyMng.ListKnownParties(context.Background(), "", 10, "")
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to list known parties after update")
 	}
 	for _, d := range updatedResponse.PartyDetails {
-		println(fmt.Sprintf("updated party details: %+v", d))
+		log.Info().Interface("party", d).Msg("updated party details")
 	}
 }

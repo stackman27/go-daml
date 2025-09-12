@@ -2,15 +2,19 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	grpcAddress := os.Getenv("GRPC_ADDRESS")
 	if grpcAddress == "" {
 		grpcAddress = "localhost:8080"
@@ -18,7 +22,7 @@ func main() {
 
 	bearerToken := os.Getenv("BEARER_TOKEN")
 	if bearerToken == "" {
-		fmt.Println("warning: BEARER_TOKEN environment variable not set")
+		log.Warn().Msg("BEARER_TOKEN environment variable not set")
 	}
 
 	tlsConfig := client.TlsConfig{}
@@ -27,24 +31,26 @@ func main() {
 		WithTLSConfig(tlsConfig).
 		Build(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to build DAML client")
 	}
 
 	pruneUpTo := time.Now().Add(-24 * time.Hour).UnixMicro()
 
 	pruneReq := &model.PruneRequest{
 		PruneUpTo:                 pruneUpTo,
-		SubmissionID:              fmt.Sprintf("prune-%d", time.Now().Unix()),
+		SubmissionID:              "prune-" + time.Now().Format("20060102150405"),
 		PruneAllDivulgedContracts: false,
 	}
 
-	fmt.Printf("attempting to prune ledger up to: %s (offset: %d)\n",
-		time.UnixMicro(pruneUpTo).Format(time.RFC3339), pruneUpTo)
+	log.Info().
+		Time("pruneUpTo", time.UnixMicro(pruneUpTo)).
+		Int64("offset", pruneUpTo).
+		Msg("attempting to prune ledger")
 
 	err = cl.PruningMng.Prune(context.Background(), pruneReq)
 	if err != nil {
-		fmt.Printf("prune operation result: %v\n", err)
+		log.Warn().Err(err).Msg("prune operation result")
 	} else {
-		fmt.Println("prune operation completed successfully")
+		log.Info().Msg("prune operation completed successfully")
 	}
 }

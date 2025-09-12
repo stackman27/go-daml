@@ -6,3 +6,4 @@ vendor
 .qoder
 .claude
 .env
+coverage.out

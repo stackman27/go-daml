@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	grpcAddress := os.Getenv("GRPC_ADDRESS")
 	if grpcAddress == "" {
 		grpcAddress = "localhost:8080"
@@ -17,7 +21,7 @@ func main() {
 
 	bearerToken := os.Getenv("BEARER_TOKEN")
 	if bearerToken == "" {
-		fmt.Println("Warning: BEARER_TOKEN environment variable not set")
+		log.Warn().Msg("BEARER_TOKEN environment variable not set")
 	}
 
 	tlsConfig := client.TlsConfig{}
@@ -26,30 +30,30 @@ func main() {
 		WithTLSConfig(tlsConfig).
 		Build(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to build DAML client")
 	}
 
 	users, err := cl.UserMng.ListUsers(context.Background())
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to list users")
 	}
 	for _, u := range users {
-		println(fmt.Sprintf("received user details: %+v ", u))
+		log.Info().Interface("user", u).Msg("received user details")
 	}
 
 	user, err := cl.UserMng.GetUser(context.Background(), "participant_admin")
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to get user")
 	}
 
-	println(fmt.Sprintf("single user details: %+v ", user))
+	log.Info().Interface("user", user).Msg("single user details")
 
 	userRights, err := cl.UserMng.ListUserRights(context.Background(), user.ID)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to list user rights")
 	}
 	for _, r := range userRights {
-		println(fmt.Sprintf("user rights: %+v ", r))
+		log.Info().Interface("right", r).Msg("user rights")
 	}
 
 	newRights := make([]*model.Right, 0)
@@ -57,17 +61,17 @@ func main() {
 
 	updatedRights, err := cl.UserMng.GrantUserRights(context.Background(), user.ID, newRights)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to grant user rights")
 	}
 	for _, r := range updatedRights {
-		println(fmt.Sprintf("user rights: %+v ", r))
+		log.Info().Interface("right", r).Msg("user rights after grant")
 	}
 
 	updatedRights, err = cl.UserMng.RevokeUserRights(context.Background(), user.ID, newRights)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("failed to revoke user rights")
 	}
 	for _, r := range updatedRights {
-		println(fmt.Sprintf("user rights: %+v ", r))
+		log.Info().Interface("right", r).Msg("user rights after revoke")
 	}
 }
