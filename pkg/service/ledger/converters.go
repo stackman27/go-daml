@@ -549,7 +549,6 @@ func signaturesToProto(sigs []*model.Signature) []*interactive.Signature {
 	return result
 }
 
-
 func identifierToString(id *v2.Identifier) string {
 	if id == nil {
 		return ""
@@ -604,4 +603,48 @@ func assignedEventFromProto(pb *v2.AssignedEvent) *model.AssignedEvent {
 		ReassignmentCounter: pb.ReassignmentCounter,
 		CreatedEvent:        createdEventFromProto(pb.CreatedEvent),
 	}
+}
+
+func exercisedEventFromProto(pb *v2.ExercisedEvent) *model.ExercisedEvent {
+	if pb == nil {
+		return nil
+	}
+
+	event := &model.ExercisedEvent{
+		Offset:               pb.Offset,
+		NodeID:               pb.NodeId,
+		ContractID:           pb.ContractId,
+		Choice:               pb.Choice,
+		ActingParties:        pb.ActingParties,
+		Consuming:            pb.Consuming,
+		WitnessParties:       pb.WitnessParties,
+		LastDescendantNodeID: pb.LastDescendantNodeId,
+		PackageName:          pb.PackageName,
+	}
+
+	if pb.TemplateId != nil {
+		event.TemplateID = identifierToString(pb.TemplateId)
+	}
+
+	if pb.InterfaceId != nil {
+		event.InterfaceID = identifierToString(pb.InterfaceId)
+	}
+
+	if pb.ChoiceArgument != nil {
+		if arg := valueFromProto(pb.ChoiceArgument); arg != nil {
+			if m, ok := arg.(map[string]interface{}); ok {
+				event.ChoiceArgument = m
+			}
+		}
+	}
+
+	if pb.ExerciseResult != nil {
+		event.ExerciseResult = valueFromProto(pb.ExerciseResult)
+	}
+
+	for _, iface := range pb.ImplementedInterfaces {
+		event.ImplementedInterfaces = append(event.ImplementedInterfaces, identifierToString(iface))
+	}
+
+	return event
 }

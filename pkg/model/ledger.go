@@ -155,6 +155,23 @@ type ArchivedEvent struct {
 	ArchivedAt *time.Time
 }
 
+type ExercisedEvent struct {
+	Offset                int64
+	NodeID                int32
+	ContractID            string
+	TemplateID            string
+	InterfaceID           string
+	Choice                string
+	ChoiceArgument        map[string]interface{}
+	ActingParties         []string
+	Consuming             bool
+	WitnessParties        []string
+	LastDescendantNodeID  int32
+	ExerciseResult        interface{}
+	PackageName           string
+	ImplementedInterfaces []string
+}
+
 // Package Service types
 type ListPackagesRequest struct{}
 
@@ -200,11 +217,11 @@ type GetActiveContractsRequest struct {
 }
 
 type GetActiveContractsResponse struct {
-	Offset                int64
-	WorkflowID            string
-	ActiveContracts       []*CreatedEvent
-	IncompleteUnassigned  *IncompleteUnassigned
-	IncompleteAssigned    *IncompleteAssigned
+	Offset               int64
+	WorkflowID           string
+	ActiveContracts      []*CreatedEvent
+	IncompleteUnassigned *IncompleteUnassigned
+	IncompleteAssigned   *IncompleteAssigned
 }
 
 type IncompleteUnassigned struct {
@@ -322,8 +339,9 @@ type Transaction struct {
 }
 
 type Event struct {
-	Created  *CreatedEvent
-	Archived *ArchivedEvent
+	Created   *CreatedEvent
+	Archived  *ArchivedEvent
+	Exercised *ExercisedEvent
 }
 
 type Reassignment struct {

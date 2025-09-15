@@ -178,7 +178,8 @@ func eventFromProto(pb *v2.Event) *model.Event {
 		event.Created = createdEventFromProto(e.Created)
 	case *v2.Event_Archived:
 		event.Archived = archivedEventFromProto(e.Archived)
-		// TODO  *v2.Event_Exercised
+	case *v2.Event_Exercised:
+		event.Exercised = exercisedEventFromProto(e.Exercised)
 	}
 
 	return event
@@ -194,12 +195,41 @@ func reassignmentFromProto(pb *v2.Reassignment) *model.Reassignment {
 		Offset:   pb.Offset,
 	}
 
-	// Note: The proto Reassignment doesn't contain all the fields in the model
-	// The additional fields may need to be extracted from ReassignmentEvents
-
 	if pb.RecordTime != nil {
 		t := pb.RecordTime.AsTime()
 		r.SubmittedAt = &t
+	}
+
+	for _, event := range pb.Events {
+		switch e := event.Event.(type) {
+		case *v2.ReassignmentEvent_Unassigned:
+			if e.Unassigned != nil {
+				r.UnassignID = e.Unassigned.UnassignId
+				r.Source = e.Unassigned.Source
+				r.Target = e.Unassigned.Target
+				r.Counter = int64(e.Unassigned.ReassignmentCounter)
+				if e.Unassigned.AssignmentExclusivity != nil {
+					t := e.Unassigned.AssignmentExclusivity.AsTime()
+					r.Unassigned = &t
+				}
+			}
+		case *v2.ReassignmentEvent_Assigned:
+			if e.Assigned != nil {
+				if r.UnassignID == "" {
+					r.UnassignID = e.Assigned.UnassignId
+				}
+				if r.Source == "" {
+					r.Source = e.Assigned.Source
+				}
+				if r.Target == "" {
+					r.Target = e.Assigned.Target
+				}
+				if r.Counter == 0 {
+					r.Counter = int64(e.Assigned.ReassignmentCounter)
+				}
+				r.Reassigned = r.SubmittedAt
+			}
+		}
 	}
 
 	return r
