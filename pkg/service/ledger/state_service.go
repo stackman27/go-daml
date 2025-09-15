@@ -128,9 +128,22 @@ func getActiveContractsResponseFromProto(pb *v2.GetActiveContractsResponse) *mod
 			resp.ActiveContracts = append(resp.ActiveContracts, createdEventFromProto(entry.ActiveContract.CreatedEvent))
 		}
 	case *v2.GetActiveContractsResponse_IncompleteUnassigned:
-		// Handle incomplete unassigned if needed
+		if entry.IncompleteUnassigned != nil {
+			resp.IncompleteUnassigned = &model.IncompleteUnassigned{
+				CreatedEvent:    createdEventFromProto(entry.IncompleteUnassigned.CreatedEvent),
+				UnassignedEvent: unassignedEventFromProto(entry.IncompleteUnassigned.UnassignedEvent),
+			}
+			// Set offset from the unassigned event if available
+			if entry.IncompleteUnassigned.UnassignedEvent != nil && entry.IncompleteUnassigned.UnassignedEvent.Offset > 0 {
+				resp.Offset = entry.IncompleteUnassigned.UnassignedEvent.Offset
+			}
+		}
 	case *v2.GetActiveContractsResponse_IncompleteAssigned:
-		// Handle incomplete assigned if needed
+		if entry.IncompleteAssigned != nil {
+			resp.IncompleteAssigned = &model.IncompleteAssigned{
+				AssignedEvent: assignedEventFromProto(entry.IncompleteAssigned.AssignedEvent),
+			}
+		}
 	}
 
 	return resp

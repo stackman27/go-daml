@@ -200,9 +200,43 @@ type GetActiveContractsRequest struct {
 }
 
 type GetActiveContractsResponse struct {
-	Offset          int64
-	WorkflowID      string
-	ActiveContracts []*CreatedEvent
+	Offset                int64
+	WorkflowID            string
+	ActiveContracts       []*CreatedEvent
+	IncompleteUnassigned  *IncompleteUnassigned
+	IncompleteAssigned    *IncompleteAssigned
+}
+
+type IncompleteUnassigned struct {
+	CreatedEvent    *CreatedEvent
+	UnassignedEvent *UnassignedEvent
+}
+
+type IncompleteAssigned struct {
+	AssignedEvent *AssignedEvent
+}
+
+type UnassignedEvent struct {
+	UnassignID            string
+	ContractID            string
+	TemplateID            string
+	Source                string
+	Target                string
+	Submitter             string
+	ReassignmentCounter   uint64
+	AssignmentExclusivity *time.Time
+	WitnessParties        []string
+	PackageName           string
+	Offset                int64
+}
+
+type AssignedEvent struct {
+	Source              string
+	Target              string
+	UnassignID          string
+	Submitter           string
+	ReassignmentCounter uint64
+	CreatedEvent        *CreatedEvent
 }
 
 type TransactionFilter struct {

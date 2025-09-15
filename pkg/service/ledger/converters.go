@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"strings"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -546,4 +547,61 @@ func signaturesToProto(sigs []*model.Signature) []*interactive.Signature {
 		}
 	}
 	return result
+}
+
+
+func identifierToString(id *v2.Identifier) string {
+	if id == nil {
+		return ""
+	}
+	if id.PackageId != "" {
+		return id.PackageId + ":" + id.ModuleName + ":" + id.EntityName
+	}
+	return id.ModuleName + ":" + id.EntityName
+}
+
+func unassignedEventFromProto(pb *v2.UnassignedEvent) *model.UnassignedEvent {
+	if pb == nil {
+		return nil
+	}
+
+	var assignmentExclusivity *time.Time
+	if pb.AssignmentExclusivity != nil {
+		t := pb.AssignmentExclusivity.AsTime()
+		assignmentExclusivity = &t
+	}
+
+	var templateID string
+	if pb.TemplateId != nil {
+		templateID = identifierToString(pb.TemplateId)
+	}
+
+	return &model.UnassignedEvent{
+		UnassignID:            pb.UnassignId,
+		ContractID:            pb.ContractId,
+		TemplateID:            templateID,
+		Source:                pb.Source,
+		Target:                pb.Target,
+		Submitter:             pb.Submitter,
+		ReassignmentCounter:   pb.ReassignmentCounter,
+		AssignmentExclusivity: assignmentExclusivity,
+		WitnessParties:        pb.WitnessParties,
+		PackageName:           pb.PackageName,
+		Offset:                pb.Offset,
+	}
+}
+
+func assignedEventFromProto(pb *v2.AssignedEvent) *model.AssignedEvent {
+	if pb == nil {
+		return nil
+	}
+
+	return &model.AssignedEvent{
+		Source:              pb.Source,
+		Target:              pb.Target,
+		UnassignID:          pb.UnassignId,
+		Submitter:           pb.Submitter,
+		ReassignmentCounter: pb.ReassignmentCounter,
+		CreatedEvent:        createdEventFromProto(pb.CreatedEvent),
+	}
 }
