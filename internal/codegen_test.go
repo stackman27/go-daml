@@ -11,6 +11,7 @@ import (
 func TestGetMainDalf(t *testing.T) {
 	srcPath := "../test-data/test.dar"
 	output := "../test-data/test_unzipped"
+	defer os.RemoveAll(output)
 
 	err := UnzipDar(srcPath, &output)
 	require.NoError(t, err)
