@@ -36,6 +36,9 @@ func TestGetMainDalf(t *testing.T) {
 	pkg, err := GetAST(dalfContent, manifest)
 	require.Nil(t, err)
 	require.NotEmpty(t, pkg.Structs)
+
+	_, err = Bind("main", pkg.Structs)
+	require.NoError(t, err)
 }
 
 func TestGetMainDalfV2(t *testing.T) {

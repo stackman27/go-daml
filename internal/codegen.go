@@ -371,6 +371,38 @@ func extractField(field *daml_lf_1_17.FieldWithType, internedStrings []string, i
 		return fieldName, "", fmt.Errorf("unsupported type sum: %T", field.Type.Sum)
 	}
 
-	log.Info().Msgf("field: %s, type: %s", fieldName, fieldType)
-	return fieldName, fieldType, nil
+	return fieldName, normalizeDAMLType(fieldType), nil
+}
+
+func normalizeDAMLType(damlType string) string {
+	switch {
+	case strings.HasPrefix(damlType, "prim:PARTY"):
+		return "PARTY"
+	case strings.HasPrefix(damlType, "prim:TEXT"):
+		return "TEXT"
+	case strings.HasPrefix(damlType, "prim:INT64"):
+		return "INT64"
+	case strings.HasPrefix(damlType, "prim:BOOL"):
+		return "BOOL"
+	case strings.HasPrefix(damlType, "prim:DECIMAL"):
+		return "DECIMAL"
+	case strings.HasPrefix(damlType, "prim:NUMERIC"):
+		return "NUMERIC"
+	case strings.HasPrefix(damlType, "prim:DATE"):
+		return "DATE"
+	case strings.HasPrefix(damlType, "prim:TIMESTAMP"):
+		return "TIMESTAMP"
+	case strings.HasPrefix(damlType, "prim:UNIT"):
+		return "UNIT"
+	case strings.HasPrefix(damlType, "prim:LIST"):
+		return "LIST"
+	case strings.HasPrefix(damlType, "prim:MAP"):
+		return "MAP"
+	case strings.HasPrefix(damlType, "prim:OPTIONAL"):
+		return "OPTIONAL"
+	case damlType == "enum":
+		return "string"
+	default:
+		return "interface{}"
+	}
 }
