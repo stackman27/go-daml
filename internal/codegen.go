@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/zip"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -16,10 +17,23 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func UnzipDar(src string, output *string) error {
+func generateRandomID() (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 15)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = charset[b[i]%byte(len(charset))]
+	}
+	return string(b), nil
+}
+
+func UnzipDar(src string, output *string) (string, error) {
 	r, err := zip.OpenReader(src)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() {
 		if err := r.Close(); err != nil {
@@ -31,6 +45,11 @@ func UnzipDar(src string, output *string) error {
 		tmpDir := os.TempDir()
 		output = &tmpDir
 	}
+	randomID, err := generateRandomID()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random ID: %w", err)
+	}
+	*output = filepath.Join(*output, randomID)
 
 	os.MkdirAll(*output, 0o755)
 
@@ -76,11 +95,11 @@ func UnzipDar(src string, output *string) error {
 	for _, f := range r.File {
 		err := extractAndWriteFile(f)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
-	return nil
+	return *output, nil
 }
 
 func GetManifest(srcPath string) (*model.Manifest, error) {
@@ -159,8 +178,6 @@ func GetAST(payload []byte, manifest *model.Manifest) (*model.Package, error) {
 				tmplStruct := model.TmplStruct{
 					Name: name,
 				}
-
-				log.Info().Msgf("data type: %+v", name)
 
 				switch v := dataType.DataCons.(type) {
 				case *daml_lf_1_17.DefDataType_Record:
