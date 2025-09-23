@@ -1,4 +1,3 @@
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE.txt)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-blue.svg)](https://golang.org/)
 [![Build Status](https://img.shields.io/badge/build-passing-green.svg)]()
 
@@ -309,10 +308,6 @@ This Go SDK is part of the broader DAML ecosystem:
 - **[DAML Ledger API](https://docs.daml.com/app-dev/ledger-api.html)** - gRPC API for interacting with DAML ledgers  
 - **[Official DAML SDKs](https://docs.daml.com/app-dev/index.html)** - Java, TypeScript, and other language bindings
 - **[Canton](https://github.com/digital-asset/canton)** - High-performance DAML ledger implementation
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE.txt](LICENSE.txt) file for details.
 
 ## Support
 
