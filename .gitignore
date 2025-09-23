@@ -9,3 +9,4 @@ vendor
 coverage.out
 .qoderignore
 test-data/test_unzipped
+bin/*

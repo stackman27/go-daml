@@ -39,17 +39,21 @@ func UnzipDar(src string, output *string) (string, error) {
 		}
 	}()
 
+	var out string
 	if output == nil {
 		tmpDir := os.TempDir()
-		output = &tmpDir
+		out = tmpDir
+	} else {
+		out = *output
 	}
+
 	randomID, err := generateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random ID: %w", err)
 	}
-	*output = filepath.Join(*output, randomID)
+	out = filepath.Join(out, randomID)
 
-	os.MkdirAll(*output, 0o755)
+	os.MkdirAll(out, 0o755)
 
 	extractAndWriteFile := func(f *zip.File) error {
 		rc, err := f.Open()
@@ -62,9 +66,9 @@ func UnzipDar(src string, output *string) (string, error) {
 			}
 		}()
 
-		path := filepath.Join(*output, f.Name)
+		path := filepath.Join(out, f.Name)
 
-		if !strings.HasPrefix(path, filepath.Clean(*output)+string(os.PathSeparator)) {
+		if !strings.HasPrefix(path, filepath.Clean(out)+string(os.PathSeparator)) {
 			return fmt.Errorf("illegal file path: %s", path)
 		}
 
@@ -97,7 +101,7 @@ func UnzipDar(src string, output *string) (string, error) {
 		}
 	}
 
-	return *output, nil
+	return out, nil
 }
 
 func GetManifest(srcPath string) (*Manifest, error) {
