@@ -60,9 +60,63 @@ func TestGetMainDalf(t *testing.T) {
 	require.Equal(t, pkg3.Fields[1].Name, "tenant")
 	require.Equal(t, pkg3.Fields[2].Name, "terms")
 
-	//res, err := Bind("main", pkg.Structs)
-	//require.NoError(t, err)
-	//require.NotEmpty(t, res)
+	res, err := Bind("main", pkg.Structs)
+	require.NoError(t, err)
+	require.NotEmpty(t, res)
+
+	// Validate the full generated code
+	expectedCode := `package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
+	"strings"
+	"time"
+)
+
+var (
+	_ = errors.New
+	_ = big.NewInt
+	_ = strings.NewReader
+)
+
+type PARTY string
+type TEXT string
+type INT64 int64
+type BOOL bool
+type DECIMAL *big.Int
+type NUMERIC *big.Int
+type DATE time.Time
+type TIMESTAMP time.Time
+type UNIT struct{}
+type LIST []interface{}
+type MAP map[string]interface{}
+type OPTIONAL *interface{}
+
+// Accept is a Record type
+type Accept struct {
+	Foo TEXT
+	Bar INT64
+}
+
+// RentalAgreement is a Record type
+type RentalAgreement struct {
+	Landlord PARTY
+	Tenant   PARTY
+	Terms    TEXT
+}
+
+// RentalProposal is a Record type
+type RentalProposal struct {
+	Landlord PARTY
+	Tenant   PARTY
+	Terms    TEXT
+}
+`
+
+	require.Equal(t, expectedCode, res, "generated code should match expected output")
 }
 
 func TestGetMainDalfV2(t *testing.T) {
@@ -173,4 +227,176 @@ func TestGetMainDalfV2(t *testing.T) {
 	require.Equal(t, optionalFieldsStruct.Name, "OptionalFields")
 	require.Equal(t, optionalFieldsStruct.Fields[0].Name, "party")
 	require.Equal(t, optionalFieldsStruct.Fields[1].Name, "aMaybe")
+
+	// Test that Address struct is identified as variant
+	require.Equal(t, "Variant", addressStruct.RawType, "Address should be identified as variant type")
+	require.True(t, addressStruct.Fields[0].IsOptional, "US field should be optional")
+	require.True(t, addressStruct.Fields[1].IsOptional, "UK field should be optional")
+
+	// Test that non-variant structs have correct RawType
+	require.Equal(t, "Record", usAddressStruct.RawType, "USAddress should be Record type")
+	require.Equal(t, "Record", ukAddressStruct.RawType, "UKAddress should be Record type")
+	require.Equal(t, "Record", personStruct.RawType, "Person should be Record type")
+	require.Equal(t, "Record", americanStruct.RawType, "American should be Record type")
+	require.Equal(t, "Record", britonStruct.RawType, "Briton should be Record type")
+	require.Equal(t, "Record", simpleFieldsStruct.RawType, "SimpleFields should be Record type")
+	require.Equal(t, "Record", optionalFieldsStruct.RawType, "OptionalFields should be Record type")
+
+	res, err := Bind("main", pkg.Structs)
+	require.NoError(t, err)
+	require.NotEmpty(t, res)
+
+	// Validate the full generated code from real DAML structures
+	expectedMainCode := `package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
+	"strings"
+	"time"
+)
+
+var (
+	_ = errors.New
+	_ = big.NewInt
+	_ = strings.NewReader
+)
+
+type PARTY string
+type TEXT string
+type INT64 int64
+type BOOL bool
+type DECIMAL *big.Int
+type NUMERIC *big.Int
+type DATE time.Time
+type TIMESTAMP time.Time
+type UNIT struct{}
+type LIST []interface{}
+type MAP map[string]interface{}
+type OPTIONAL *interface{}
+
+// Address is a variant/union type
+type Address struct {
+	Us *USAddress ` + "`json:\"US,omitempty\"`" + `
+	Uk *UKAddress ` + "`json:\"UK,omitempty\"`" + `
+}
+
+// MarshalJSON implements custom JSON marshaling for Address
+func (v Address) MarshalJSON() ([]byte, error) {
+
+	if v.Us != nil {
+		return json.Marshal(map[string]interface{}{
+			"tag":   "US",
+			"value": v.Us,
+		})
+	}
+
+	if v.Uk != nil {
+		return json.Marshal(map[string]interface{}{
+			"tag":   "UK",
+			"value": v.Uk,
+		})
+	}
+
+	return json.Marshal(map[string]interface{}{})
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Address
+func (v *Address) UnmarshalJSON(data []byte) error {
+	var tagged struct {
+		Tag   string          ` + "`json:\"tag\"`" + `
+		Value json.RawMessage ` + "`json:\"value\"`" + `
+	}
+
+	if err := json.Unmarshal(data, &tagged); err != nil {
+		return err
+	}
+
+	switch tagged.Tag {
+
+	case "US":
+		var value USAddress
+		if err := json.Unmarshal(tagged.Value, &value); err != nil {
+			return err
+		}
+		v.Us = &value
+
+	case "UK":
+		var value UKAddress
+		if err := json.Unmarshal(tagged.Value, &value); err != nil {
+			return err
+		}
+		v.Uk = &value
+
+	default:
+		return fmt.Errorf("unknown tag: %s", tagged.Tag)
+	}
+
+	return nil
+}
+
+// American is a Record type
+type American struct {
+	Person  PARTY
+	Address USAddress
+}
+
+// Briton is a Record type
+type Briton struct {
+	Person  PARTY
+	Address UKAddress
+}
+
+// OptionalFields is a Record type
+type OptionalFields struct {
+	Party  PARTY
+	AMaybe OPTIONAL
+}
+
+// OptionalFieldsCleanUp is a Record type
+type OptionalFieldsCleanUp struct {
+}
+
+// Person is a Record type
+type Person struct {
+	Person  PARTY
+	Address Address
+}
+
+// SimpleFields is a Record type
+type SimpleFields struct {
+	Party     PARTY
+	ABool     BOOL
+	AInt      INT64
+	ADecimal  NUMERIC
+	AText     TEXT
+	ADate     DATE
+	ADatetime TIMESTAMP
+}
+
+// SimpleFieldsCleanUp is a Record type
+type SimpleFieldsCleanUp struct {
+}
+
+// UKAddress is a Record type
+type UKAddress struct {
+	Address  LIST
+	Locality OPTIONAL
+	City     TEXT
+	State    TEXT
+	Postcode TEXT
+}
+
+// USAddress is a Record type
+type USAddress struct {
+	Address LIST
+	City    TEXT
+	State   TEXT
+	Zip     INT64
+}
+`
+
+	require.Equal(t, expectedMainCode, res, "Generated main package code should match expected output")
 }

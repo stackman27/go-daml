@@ -160,9 +160,6 @@ func NewCodegenAst(pkg *daml.Package) *codeGenAst {
 
 func (c *codeGenAst) getName(id int32) string {
 	idx := c.Package.InternedDottedNames[id].SegmentsInternedStr
-	if len(idx) > 1 {
-		log.Info().Msgf("more then 1")
-	}
 	return c.Package.InternedStrings[idx[len(idx)-1]]
 }
 
@@ -180,6 +177,7 @@ func (c *codeGenAst) getDataTypes(module *daml.Module) (map[string]*tmplStruct, 
 
 		switch v := dataType.DataCons.(type) {
 		case *daml.DefDataType_Record:
+			tmplStruct.RawType = "Record"
 			for _, field := range v.Record.Fields {
 				fieldExtracted, typeExtracted, err := c.extractField(field)
 				if err != nil {
@@ -192,19 +190,22 @@ func (c *codeGenAst) getDataTypes(module *daml.Module) (map[string]*tmplStruct, 
 				})
 			}
 		case *daml.DefDataType_Variant:
+			tmplStruct.RawType = "Variant"
 			for _, field := range v.Variant.Fields {
 				fieldExtracted, typeExtracted, err := c.extractField(field)
 				if err != nil {
 					return nil, err
 				}
 				tmplStruct.Fields = append(tmplStruct.Fields, &tmplField{
-					Name:    fieldExtracted,
-					Type:    typeExtracted,
-					RawType: field.String(),
+					Name:       fieldExtracted,
+					Type:       typeExtracted,
+					RawType:    field.String(),
+					IsOptional: true,
 				})
 				log.Info().Msgf("variant constructor: %s, type: %s", fieldExtracted, typeExtracted)
 			}
 		case *daml.DefDataType_Enum:
+			tmplStruct.RawType = "Enum"
 			for _, constructorIdx := range v.Enum.ConstructorsInternedStr {
 				constructorName := c.getName(constructorIdx)
 				tmplStruct.Fields = append(tmplStruct.Fields, &tmplField{
@@ -214,6 +215,7 @@ func (c *codeGenAst) getDataTypes(module *daml.Module) (map[string]*tmplStruct, 
 				log.Info().Msgf("enum constructor: %s", constructorName)
 			}
 		case *daml.DefDataType_Interface:
+			tmplStruct.RawType = "Interface"
 			log.Warn().Msgf("interface not supported %s", v.Interface.String())
 		default:
 			log.Warn().Msgf("unknown data cons type: %T", v)
@@ -367,50 +369,42 @@ func GetAST(payload []byte, manifest *Manifest) (*Package, error) {
 
 func normalizeDAMLType(damlType string) string {
 	switch {
-	case strings.HasPrefix(damlType, "prim:PARTY"):
+	case strings.Contains(damlType, "prim:PARTY"):
 		return "PARTY"
-	case strings.HasPrefix(damlType, "prim:TEXT"):
+	case strings.Contains(damlType, "prim:TEXT"):
 		return "TEXT"
-	case strings.HasPrefix(damlType, "prim:INT64"):
+	case strings.Contains(damlType, "prim:INT64"):
 		return "INT64"
-	case strings.HasPrefix(damlType, "prim:BOOL"):
+	case strings.Contains(damlType, "prim:BOOL"):
 		return "BOOL"
-	case strings.HasPrefix(damlType, "prim:DECIMAL"):
+	case strings.Contains(damlType, "prim:DECIMAL"):
 		return "DECIMAL"
-	case strings.HasPrefix(damlType, "prim:NUMERIC"):
+	case strings.Contains(damlType, "prim:NUMERIC"):
 		return "NUMERIC"
-	case strings.HasPrefix(damlType, "prim:DATE"):
+	case strings.Contains(damlType, "prim:DATE"):
 		return "DATE"
-	case strings.HasPrefix(damlType, "prim:TIMESTAMP"):
+	case strings.Contains(damlType, "prim:TIMESTAMP"):
 		return "TIMESTAMP"
-	case strings.HasPrefix(damlType, "prim:UNIT"):
+	case strings.Contains(damlType, "prim:UNIT"):
 		return "UNIT"
-	case strings.HasPrefix(damlType, "prim:LIST"):
+	case strings.Contains(damlType, "prim:LIST"):
 		return "LIST"
-	case strings.HasPrefix(damlType, "prim:MAP"):
+	case strings.Contains(damlType, "prim:MAP"):
 		return "MAP"
-	case strings.HasPrefix(damlType, "prim:OPTIONAL"):
+	case strings.Contains(damlType, "prim:OPTIONAL"):
 		return "OPTIONAL"
-	case strings.HasPrefix(damlType, "prim:CONTRACT_ID"):
+	case strings.Contains(damlType, "prim:CONTRACT_ID"):
 		return "CONTRACT_ID"
-	case strings.HasPrefix(damlType, "prim:GENMAP"):
+	case strings.Contains(damlType, "prim:GENMAP"):
 		return "GENMAP"
-	case strings.HasPrefix(damlType, "prim:TEXTMAP"):
+	case strings.Contains(damlType, "prim:TEXTMAP"):
 		return "TEXTMAP"
-	case strings.HasPrefix(damlType, "prim:BIGNUMERIC"):
+	case strings.Contains(damlType, "prim:BIGNUMERIC"):
 		return "BIGNUMERIC"
-	case strings.HasPrefix(damlType, "prim:ROUNDING_MODE"):
+	case strings.Contains(damlType, "prim:ROUNDING_MODE"):
 		return "ROUNDING_MODE"
-	case strings.HasPrefix(damlType, "prim:ANY"):
+	case strings.Contains(damlType, "prim:ANY"):
 		return "ANY"
-	case strings.HasPrefix(damlType, "prim:TYPE_REP"):
-		return "TYPE_REP"
-	case strings.HasPrefix(damlType, "prim:ARROW"):
-		return "ARROW"
-	case strings.HasPrefix(damlType, "prim:UPDATE"):
-		return "UPDATE"
-	case strings.HasPrefix(damlType, "prim:SCENARIO"):
-		return "SCENARIO"
 	case damlType == "enum":
 		return "string"
 	default:
