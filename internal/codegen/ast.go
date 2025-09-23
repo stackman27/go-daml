@@ -3,20 +3,24 @@ package codegen
 import "time"
 
 type tmplStruct struct {
-	Name   string
-	Fields []*tmplField
+	Name    string
+	Fields  []*tmplField
+	RawType string
 }
 
 type tmplField struct {
-	Type string
-	Name string
+	Type       string
+	Name       string
+	RawType    string
+	IsOptional bool
 }
 
 type Package struct {
-	Name     string
-	Version  string
-	Structs  map[string]*tmplStruct
-	Metadata *Metadata
+	Name      string
+	Version   string
+	PackageID string
+	Structs   map[string]*tmplStruct
+	Metadata  *Metadata
 }
 
 type Metadata struct {
