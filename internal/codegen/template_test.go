@@ -8,7 +8,8 @@ import (
 func TestBind(t *testing.T) {
 	structs := map[string]*tmplStruct{
 		"RentalProposal": {
-			Name: "RentalProposal",
+			Name:    "RentalProposal",
+			RawType: "Record",
 			Fields: []*tmplField{
 				{Name: "landlord", Type: "string"},
 				{Name: "tenant", Type: "string"},
@@ -16,7 +17,8 @@ func TestBind(t *testing.T) {
 			},
 		},
 		"RentalAgreement": {
-			Name: "RentalAgreement",
+			Name:    "RentalAgreement",
+			RawType: "Record",
 			Fields: []*tmplField{
 				{Name: "landlord", Type: "string"},
 				{Name: "tenant", Type: "string"},
@@ -49,6 +51,10 @@ func TestBind(t *testing.T) {
 
 	if !strings.Contains(result, "Landlord string") {
 		t.Error("Generated code does not contain capitalized field names")
+	}
+
+	if !strings.Contains(result, `json:"landlord"`) {
+		t.Error("Generated code does not contain JSON tags with original field names")
 	}
 
 	// Print the result for inspection

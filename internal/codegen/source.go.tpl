@@ -90,7 +90,7 @@ type OPTIONAL *interface{}
 	// {{capitalise .Name}} is a {{.RawType}} type
 	type {{capitalise .Name}} struct {
 		{{range $field := .Fields}}
-		{{capitalise $field.Name}} {{$field.Type}}{{end}}
+		{{capitalise $field.Name}} {{$field.Type}} `json:"{{$field.Name}}"`{{end}}
 	}
 	{{end}}
 {{end}}

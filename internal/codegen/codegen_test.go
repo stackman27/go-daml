@@ -99,22 +99,22 @@ type OPTIONAL *interface{}
 
 // Accept is a Record type
 type Accept struct {
-	Foo TEXT
-	Bar INT64
+	Foo TEXT  ` + "`json:\"foo\"`" + `
+	Bar INT64 ` + "`json:\"bar\"`" + `
 }
 
 // RentalAgreement is a Record type
 type RentalAgreement struct {
-	Landlord PARTY
-	Tenant   PARTY
-	Terms    TEXT
+	Landlord PARTY ` + "`json:\"landlord\"`" + `
+	Tenant   PARTY ` + "`json:\"tenant\"`" + `
+	Terms    TEXT  ` + "`json:\"terms\"`" + `
 }
 
 // RentalProposal is a Record type
 type RentalProposal struct {
-	Landlord PARTY
-	Tenant   PARTY
-	Terms    TEXT
+	Landlord PARTY ` + "`json:\"landlord\"`" + `
+	Tenant   PARTY ` + "`json:\"tenant\"`" + `
+	Terms    TEXT  ` + "`json:\"terms\"`" + `
 }
 `
 
@@ -343,20 +343,20 @@ func (v *Address) UnmarshalJSON(data []byte) error {
 
 // American is a Record type
 type American struct {
-	Person  PARTY
-	Address USAddress
+	Person  PARTY     ` + "`json:\"person\"`" + `
+	Address USAddress ` + "`json:\"address\"`" + `
 }
 
 // Briton is a Record type
 type Briton struct {
-	Person  PARTY
-	Address UKAddress
+	Person  PARTY     ` + "`json:\"person\"`" + `
+	Address UKAddress ` + "`json:\"address\"`" + `
 }
 
 // OptionalFields is a Record type
 type OptionalFields struct {
-	Party  PARTY
-	AMaybe OPTIONAL
+	Party  PARTY    ` + "`json:\"party\"`" + `
+	AMaybe OPTIONAL ` + "`json:\"aMaybe\"`" + `
 }
 
 // OptionalFieldsCleanUp is a Record type
@@ -365,19 +365,19 @@ type OptionalFieldsCleanUp struct {
 
 // Person is a Record type
 type Person struct {
-	Person  PARTY
-	Address Address
+	Person  PARTY   ` + "`json:\"person\"`" + `
+	Address Address ` + "`json:\"address\"`" + `
 }
 
 // SimpleFields is a Record type
 type SimpleFields struct {
-	Party     PARTY
-	ABool     BOOL
-	AInt      INT64
-	ADecimal  NUMERIC
-	AText     TEXT
-	ADate     DATE
-	ADatetime TIMESTAMP
+	Party     PARTY     ` + "`json:\"party\"`" + `
+	ABool     BOOL      ` + "`json:\"aBool\"`" + `
+	AInt      INT64     ` + "`json:\"aInt\"`" + `
+	ADecimal  NUMERIC   ` + "`json:\"aDecimal\"`" + `
+	AText     TEXT      ` + "`json:\"aText\"`" + `
+	ADate     DATE      ` + "`json:\"aDate\"`" + `
+	ADatetime TIMESTAMP ` + "`json:\"aDatetime\"`" + `
 }
 
 // SimpleFieldsCleanUp is a Record type
@@ -386,19 +386,19 @@ type SimpleFieldsCleanUp struct {
 
 // UKAddress is a Record type
 type UKAddress struct {
-	Address  LIST
-	Locality OPTIONAL
-	City     TEXT
-	State    TEXT
-	Postcode TEXT
+	Address  LIST     ` + "`json:\"address\"`" + `
+	Locality OPTIONAL ` + "`json:\"locality\"`" + `
+	City     TEXT     ` + "`json:\"city\"`" + `
+	State    TEXT     ` + "`json:\"state\"`" + `
+	Postcode TEXT     ` + "`json:\"postcode\"`" + `
 }
 
 // USAddress is a Record type
 type USAddress struct {
-	Address LIST
-	City    TEXT
-	State   TEXT
-	Zip     INT64
+	Address LIST  ` + "`json:\"address\"`" + `
+	City    TEXT  ` + "`json:\"city\"`" + `
+	State   TEXT  ` + "`json:\"state\"`" + `
+	Zip     INT64 ` + "`json:\"zip\"`" + `
 }
 `
 
