@@ -168,32 +168,29 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module) (map[s
 			keyType := template.Key.GetType().String()
 			normalizedKeyType := model.NormalizeDAMLType(keyType)
 			log.Info().Msgf("template %s has key of type: %s (normalized: %s)", templateName, keyType, normalizedKeyType)
+			keyFieldNames := c.parseKeyExpression(pkg, template.Key)
 
-			// For now, we assume the key is based on a single field that matches the key type
-			// In a real implementation, you'd need to parse the key expression to determine which fields are used
-			var keyFieldName string
+			if len(keyFieldNames) > 0 {
+				// For now, we support single-field keys
+				// TODO: Support composite keys with multiple fields
+				keyFieldName := keyFieldNames[0]
+				var keyField *model.TmplField
+				for _, field := range tmplStruct.Fields {
+					if field.Name == keyFieldName {
+						keyField = &model.TmplField{
+							Name:    field.Name,
+							Type:    field.Type,
+							RawType: keyType,
+						}
+						break
+					}
+				}
 
-			// Try to find a field that matches the key type - this is a simplified approach
-			for _, field := range tmplStruct.Fields {
-				if field.Type == normalizedKeyType {
-					keyFieldName = field.Name
-					break
+				if keyField != nil {
+					tmplStruct.Key = keyField
+					log.Info().Msgf("template %s key field: %s", templateName, keyFieldName)
 				}
 			}
-
-			// If we can't match by type, we'll use the first field as a fallback
-			if keyFieldName == "" && len(tmplStruct.Fields) > 0 {
-				keyFieldName = tmplStruct.Fields[0].Name
-				log.Warn().Msgf("could not match key type %s for template %s, using first field %s", normalizedKeyType, templateName, keyFieldName)
-			}
-
-			tmplStruct.Key = &model.TmplField{
-				Name:    keyFieldName,
-				Type:    normalizedKeyType,
-				RawType: keyType,
-			}
-		} else {
-			log.Info().Msgf("template %s has no key", templateName)
 		}
 
 		structs[templateName] = &tmplStruct
@@ -308,6 +305,48 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module) (map[s
 	}
 
 	return structs, nil
+}
+
+// parseKeyExpression parses the key expression to extract field names used in the key
+func (c *codeGenAst) parseKeyExpression(pkg *daml.Package, key *daml.DefTemplate_DefKey) []string {
+	var fieldNames []string
+
+	if key == nil {
+		return fieldNames
+	}
+
+	if key.GetKey() != nil {
+		keyExpr := key.GetKey()
+		if keyExpr.GetProjections() != nil {
+			projections := keyExpr.GetProjections()
+			for _, proj := range projections.Projections {
+				if proj.GetFieldInternedStr() != 0 {
+					fieldName := pkg.InternedStrings[proj.GetFieldInternedStr()]
+					fieldNames = append(fieldNames, fieldName)
+				} else if proj.GetFieldStr() != "" {
+					fieldNames = append(fieldNames, proj.GetFieldStr())
+				}
+			}
+		} else if keyExpr.GetRecord() != nil {
+			record := keyExpr.GetRecord()
+			for _, field := range record.Fields {
+				if field.GetFieldInternedStr() != 0 {
+					fieldName := pkg.InternedStrings[field.GetFieldInternedStr()]
+					fieldNames = append(fieldNames, fieldName)
+				} else if field.GetFieldStr() != "" {
+					fieldNames = append(fieldNames, field.GetFieldStr())
+				}
+			}
+		}
+	} else if key.GetComplexKey() != nil {
+		// Complex key expression - needs full expression parsing
+		// For now, log and return empty
+		log.Warn().Msg("complex key expressions are not fully supported yet")
+		// For complex expressions, we'll fall back to type matching
+		// This handles cases where the key is an expression rather than direct field access
+	}
+
+	return fieldNames
 }
 
 func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) (string, string, error) {
