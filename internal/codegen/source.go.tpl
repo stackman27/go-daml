@@ -7,6 +7,9 @@ import (
 	"strings"
 	"errors"
 	"time"
+	
+	"github.com/noders-team/go-daml/pkg/model"
+	. "github.com/noders-team/go-daml/pkg/types"
 )
 
 var (
@@ -17,18 +20,20 @@ var (
 
 const PackageID = "{{.PackageID}}"
 
-type PARTY string
-type TEXT string
-type INT64 int64
-type BOOL bool
-type DECIMAL *big.Int
-type NUMERIC *big.Int
-type DATE time.Time
-type TIMESTAMP time.Time
-type UNIT struct{}
-type LIST []string
-type MAP map[string]interface{}
-type OPTIONAL *interface{}
+func argsToMap(args interface{}) map[string]interface{} {
+	if args == nil {
+		return map[string]interface{}{}
+	}
+	
+	if m, ok := args.(map[string]interface{}); ok {
+		return m
+	}
+	
+	return map[string]interface{}{
+		"args": args,
+	}
+}
+
 
 {{$structs := .Structs}}
 {{range $structs}}
@@ -90,7 +95,65 @@ type OPTIONAL *interface{}
 	// {{capitalise .Name}} is a {{.RawType}} type
 	type {{capitalise .Name}} struct {
 		{{range $field := .Fields}}
-		{{capitalise $field.Name}} {{$field.Type}}{{end}}
+		{{capitalise $field.Name}} {{$field.Type}} `json:"{{$field.Name}}"`{{end}}
+	}
+	{{if .IsTemplate}}
+	
+	// GetTemplateID returns the template ID for this template
+	func (t {{capitalise .Name}}) GetTemplateID() string {
+		return fmt.Sprintf("%s:%s:%s", PackageID, "{{.ModuleName}}", "{{capitalise .Name}}")
+	}
+	
+	// CreateCommand returns a CreateCommand for this template
+	func (t {{capitalise .Name}}) CreateCommand() *model.CreateCommand {
+		args := make(map[string]interface{})
+		{{range $field := .Fields}}
+		{{if or $field.IsOptional (eq $field.Type "GENMAP") (eq $field.Type "MAP") (eq $field.Type "LIST")}}
+		if {{template "fieldIsNotEmpty" $field}} {
+			args["{{$field.Name}}"] = {{template "fieldToDAMLValue" $field}}
+		}{{else}}
+		args["{{$field.Name}}"] = {{template "fieldToDAMLValue" $field}}{{end}}
+		{{end}}
+		return &model.CreateCommand{
+			TemplateID: t.GetTemplateID(),
+			Arguments: args,
+		}
+	}
+	{{if .Key}}
+	
+	// GetKey returns the key for this template as a string
+	func (t {{capitalise .Name}}) GetKey() string {
+		{{if eq .Key.Type "TEXT"}}
+		return string(t.{{capitalise .Key.Name}})
+		{{else if eq .Key.Type "PARTY"}}
+		return string(t.{{capitalise .Key.Name}})
+		{{else if eq .Key.Type "INT64"}}
+		return fmt.Sprintf("%d", t.{{capitalise .Key.Name}})
+		{{else}}
+		return fmt.Sprintf("%v", t.{{capitalise .Key.Name}})
+		{{end}}
 	}
 	{{end}}
+	{{end}}
+	{{if and .IsTemplate .Choices}}
+	{{$templateName := .Name}}
+	{{$moduleName := .ModuleName}}
+	// Choice methods for {{capitalise .Name}}
+	{{range $choice := .Choices}}
+	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract
+	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if $choice.ArgType}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
+		return &model.ExerciseCommand{
+			TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),
+			ContractID: contractID,
+			Choice: "{{$choice.Name}}",
+			{{if $choice.ArgType}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
+		}
+	}
+	{{end}}
+	{{end}}
+	{{end}}
 {{end}}
+
+{{define "fieldToDAMLValue"}}{{if eq .Type "PARTY"}}map[string]interface{}{"_type": "party", "value": string(t.{{capitalise .Name}})}{{else if eq .Type "TEXT"}}string(t.{{capitalise .Name}}){{else if eq .Type "INT64"}}int64(t.{{capitalise .Name}}){{else if eq .Type "BOOL"}}bool(t.{{capitalise .Name}}){{else if eq .Type "NUMERIC"}}t.{{capitalise .Name}}{{else if eq .Type "DECIMAL"}}t.{{capitalise .Name}}{{else if eq .Type "DATE"}}t.{{capitalise .Name}}{{else if eq .Type "TIMESTAMP"}}t.{{capitalise .Name}}{{else if eq .Type "UNIT"}}map[string]interface{}{"_type": "unit"}{{else if eq .Type "LIST"}}t.{{capitalise .Name}}{{else if eq .Type "GENMAP"}}map[string]interface{}{"_type": "genmap", "value": t.{{capitalise .Name}}}{{else if eq .Type "MAP"}}t.{{capitalise .Name}}{{else if eq .Type "OPTIONAL"}}t.{{capitalise .Name}}{{else}}t.{{capitalise .Name}}{{end}}{{end}}
+
+{{define "fieldIsNotEmpty"}}{{if eq .Type "PARTY"}}t.{{capitalise .Name}} != ""{{else if eq .Type "TEXT"}}t.{{capitalise .Name}} != ""{{else if eq .Type "INT64"}}t.{{capitalise .Name}} != 0{{else if eq .Type "BOOL"}}true{{else if eq .Type "NUMERIC"}}t.{{capitalise .Name}} != nil{{else if eq .Type "DECIMAL"}}t.{{capitalise .Name}} != nil{{else if eq .Type "DATE"}}!t.{{capitalise .Name}}.IsZero(){{else if eq .Type "TIMESTAMP"}}!t.{{capitalise .Name}}.IsZero(){{else if eq .Type "LIST"}}len(t.{{capitalise .Name}}) > 0{{else if eq .Type "GENMAP"}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0{{else if eq .Type "MAP"}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0{{else if eq .Type "OPTIONAL"}}t.{{capitalise .Name}} != nil{{else}}t.{{capitalise .Name}} != nil{{end}}{{end}}

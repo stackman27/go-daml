@@ -12,6 +12,7 @@ import (
 	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/noders-team/go-daml/pkg/types"
 )
 
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
@@ -25,10 +26,6 @@ func parseTemplateID(templateID string) (packageID, moduleName, entityName strin
 }
 
 func commandsToProto(cmd *model.Commands) *v2.Commands {
-	if cmd == nil {
-		return nil
-	}
-
 	pbCmd := &v2.Commands{
 		WorkflowId:   cmd.WorkflowID,
 		UserId:       cmd.UserID,
@@ -62,10 +59,6 @@ func commandsToProto(cmd *model.Commands) *v2.Commands {
 }
 
 func commandsArrayToProto(cmds []*model.Command) []*v2.Command {
-	if cmds == nil {
-		return nil
-	}
-
 	result := make([]*v2.Command, len(cmds))
 	for i, cmd := range cmds {
 		result[i] = commandToProto(cmd)
@@ -74,14 +67,10 @@ func commandsArrayToProto(cmds []*model.Command) []*v2.Command {
 }
 
 func commandToProto(cmd *model.Command) *v2.Command {
-	if cmd == nil {
-		return nil
-	}
-
 	pbCmd := &v2.Command{}
 
 	switch c := cmd.Command.(type) {
-	case model.CreateCommand:
+	case *model.CreateCommand:
 		packageID, moduleName, entityName := parseTemplateID(c.TemplateID)
 		pbCmd.Command = &v2.Command_Create{
 			Create: &v2.CreateCommand{
@@ -93,7 +82,7 @@ func commandToProto(cmd *model.Command) *v2.Command {
 				CreateArguments: convertToRecord(c.Arguments),
 			},
 		}
-	case model.ExerciseCommand:
+	case *model.ExerciseCommand:
 		packageID, moduleName, entityName := parseTemplateID(c.TemplateID)
 		pbCmd.Command = &v2.Command_Exercise{
 			Exercise: &v2.ExerciseCommand{
@@ -107,7 +96,7 @@ func commandToProto(cmd *model.Command) *v2.Command {
 				ChoiceArgument: mapToValue(c.Arguments),
 			},
 		}
-	case model.ExerciseByKeyCommand:
+	case *model.ExerciseByKeyCommand:
 		packageID, moduleName, entityName := parseTemplateID(c.TemplateID)
 		pbCmd.Command = &v2.Command_ExerciseByKey{
 			ExerciseByKey: &v2.ExerciseByKeyCommand{
@@ -176,6 +165,23 @@ func templateFilterToProto(tf *model.TemplateFilter) *v2.TemplateFilter {
 			EntityName: entityName,
 		},
 		IncludeCreatedEventBlob: tf.IncludeCreatedEventBlob,
+	}
+}
+
+func eventFormatToProto(format *model.EventFormat) *v2.EventFormat {
+	if format == nil {
+		return nil
+	}
+	filtersByParty := make(map[string]*v2.Filters)
+	if format.FiltersByParty != nil {
+		for key, val := range format.FiltersByParty {
+			filtersByParty[key] = filtersToProto(val)
+		}
+	}
+	return &v2.EventFormat{
+		FiltersForAnyParty: filtersToProto(format.FiltersForAnyParty),
+		FiltersByParty:     filtersByParty,
+		Verbose:            format.Verbose,
 	}
 }
 
@@ -303,9 +309,47 @@ func mapToValue(data interface{}) *v2.Value {
 		if typeStr, ok := v["_type"].(string); ok && typeStr == "unit" {
 			return &v2.Value{Sum: &v2.Value_Unit{Unit: &emptypb.Empty{}}}
 		}
+		if typeStr, ok := v["_type"].(string); ok && typeStr == "party" {
+			if partyValue, ok := v["value"].(string); ok {
+				return &v2.Value{Sum: &v2.Value_Party{Party: partyValue}}
+			}
+		}
+		if typeStr, ok := v["_type"].(string); ok && typeStr == "genmap" {
+			if mapValue, ok := v["value"].(map[string]interface{}); ok {
+				entries := make([]*v2.TextMap_Entry, 0, len(mapValue))
+				for key, val := range mapValue {
+					entries = append(entries, &v2.TextMap_Entry{
+						Key:   key,
+						Value: mapToValue(val),
+					})
+				}
+				return &v2.Value{
+					Sum: &v2.Value_TextMap{
+						TextMap: &v2.TextMap{
+							Entries: entries,
+						},
+					},
+				}
+			} else if genMapValue, ok := v["value"].(types.GENMAP); ok {
+				entries := make([]*v2.TextMap_Entry, 0, len(genMapValue))
+				for key, val := range genMapValue {
+					entries = append(entries, &v2.TextMap_Entry{
+						Key:   key,
+						Value: mapToValue(val),
+					})
+				}
+				return &v2.Value{
+					Sum: &v2.Value_TextMap{
+						TextMap: &v2.TextMap{
+							Entries: entries,
+						},
+					},
+				}
+			}
+		}
 		fields := make([]*v2.RecordField, 0, len(v))
 		for key, val := range v {
-			if key != "_type" {
+			if key != "_type" && key != "value" {
 				fields = append(fields, &v2.RecordField{
 					Label: key,
 					Value: mapToValue(val),

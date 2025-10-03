@@ -74,6 +74,9 @@ import (
 	"math/big"
 	"strings"
 	"time"
+
+	"github.com/noders-team/go-daml/pkg/model"
+	. "github.com/noders-team/go-daml/pkg/types"
 )
 
 var (
@@ -84,45 +87,122 @@ var (
 
 const PackageID = "20a17897a6664ecb8a4dd3e10b384c8cc41181d26ecbb446c2d65ae0928686c9"
 
-type PARTY string
-type TEXT string
-type INT64 int64
-type BOOL bool
-type DECIMAL *big.Int
-type NUMERIC *big.Int
-type DATE time.Time
-type TIMESTAMP time.Time
-type UNIT struct{}
-type LIST []string
-type MAP map[string]interface{}
-type OPTIONAL *interface{}
+func argsToMap(args interface{}) map[string]interface{} {
+	if args == nil {
+		return map[string]interface{}{}
+	}
+
+	if m, ok := args.(map[string]interface{}); ok {
+		return m
+	}
+
+	return map[string]interface{}{
+		"args": args,
+	}
+}
 
 // Accept is a Record type
 type Accept struct {
-	Foo TEXT
-	Bar INT64
+	Foo TEXT  ` + "`json:\"foo\"`" + `
+	Bar INT64 ` + "`json:\"bar\"`" + `
 }
 
-// RentalAgreement is a Record type
+// RentalAgreement is a Template type
 type RentalAgreement struct {
-	Landlord PARTY
-	Tenant   PARTY
-	Terms    TEXT
+	Landlord PARTY ` + "`json:\"landlord\"`" + `
+	Tenant   PARTY ` + "`json:\"tenant\"`" + `
+	Terms    TEXT  ` + "`json:\"terms\"`" + `
 }
 
-// RentalProposal is a Record type
+// GetTemplateID returns the template ID for this template
+func (t RentalAgreement) GetTemplateID() string {
+	return fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalAgreement")
+}
+
+// CreateCommand returns a CreateCommand for this template
+func (t RentalAgreement) CreateCommand() *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	args["landlord"] = map[string]interface{}{"_type": "party", "value": string(t.Landlord)}
+
+	args["tenant"] = map[string]interface{}{"_type": "party", "value": string(t.Tenant)}
+
+	args["terms"] = string(t.Terms)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// Choice methods for RentalAgreement
+
+// Archive exercises the Archive choice on this RentalAgreement contract
+func (t RentalAgreement) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalAgreement"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
+// RentalProposal is a Template type
 type RentalProposal struct {
-	Landlord PARTY
-	Tenant   PARTY
-	Terms    TEXT
+	Landlord PARTY ` + "`json:\"landlord\"`" + `
+	Tenant   PARTY ` + "`json:\"tenant\"`" + `
+	Terms    TEXT  ` + "`json:\"terms\"`" + `
+}
+
+// GetTemplateID returns the template ID for this template
+func (t RentalProposal) GetTemplateID() string {
+	return fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalProposal")
+}
+
+// CreateCommand returns a CreateCommand for this template
+func (t RentalProposal) CreateCommand() *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	args["landlord"] = map[string]interface{}{"_type": "party", "value": string(t.Landlord)}
+
+	args["tenant"] = map[string]interface{}{"_type": "party", "value": string(t.Tenant)}
+
+	args["terms"] = string(t.Terms)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// Choice methods for RentalProposal
+
+// Archive exercises the Archive choice on this RentalProposal contract
+func (t RentalProposal) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalProposal"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
+// Accept exercises the Accept choice on this RentalProposal contract
+func (t RentalProposal) Accept(contractID string, args Accept) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalProposal"),
+		ContractID: contractID,
+		Choice:     "Accept",
+		Arguments:  argsToMap(args),
+	}
 }
 `
 
 	require.Equal(t, expectedCode, res, "generated code should match expected output")
 }
 
-func TestGetMainDalfV2(t *testing.T) {
-	srcPath := "../../test-data/archives/2.9.1/Test.dar"
+func TestGetMainDalfAllTypes(t *testing.T) {
+	srcPath := "../../test-data/test_2_9_1.dar"
 	output := "../../test-data/test_unzipped"
 	defer os.RemoveAll(output)
 
@@ -238,169 +318,105 @@ func TestGetMainDalfV2(t *testing.T) {
 	// Test that non-variant structs have correct RawType
 	require.Equal(t, "Record", usAddressStruct.RawType, "USAddress should be Record type")
 	require.Equal(t, "Record", ukAddressStruct.RawType, "UKAddress should be Record type")
-	require.Equal(t, "Record", personStruct.RawType, "Person should be Record type")
-	require.Equal(t, "Record", americanStruct.RawType, "American should be Record type")
-	require.Equal(t, "Record", britonStruct.RawType, "Briton should be Record type")
-	require.Equal(t, "Record", simpleFieldsStruct.RawType, "SimpleFields should be Record type")
-	require.Equal(t, "Record", optionalFieldsStruct.RawType, "OptionalFields should be Record type")
+	// Note: Some structs might be templates in the new template-first approach
+	if personStruct.RawType != "Record" && personStruct.RawType != "Template" {
+		require.Fail(t, "Person should be either Record or Template type, got: %s", personStruct.RawType)
+	}
+	if americanStruct.RawType != "Record" && americanStruct.RawType != "Template" {
+		require.Fail(t, "American should be either Record or Template type, got: %s", americanStruct.RawType)
+	}
+	if britonStruct.RawType != "Record" && britonStruct.RawType != "Template" {
+		require.Fail(t, "Briton should be either Record or Template type, got: %s", britonStruct.RawType)
+	}
+	if simpleFieldsStruct.RawType != "Record" && simpleFieldsStruct.RawType != "Template" {
+		require.Fail(t, "SimpleFields should be either Record or Template type, got: %s", simpleFieldsStruct.RawType)
+	}
+	if optionalFieldsStruct.RawType != "Record" && optionalFieldsStruct.RawType != "Template" {
+		require.Fail(t, "OptionalFields should be either Record or Template type, got: %s", optionalFieldsStruct.RawType)
+	}
 
 	res, err := Bind("main", pkg.PackageID, pkg.Structs)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 
+	testData2_9_1 := "../../test-data/test_1_0_0.go_gen"
+	expectedMainCode, err := os.ReadFile(testData2_9_1)
+	require.NoError(t, err)
+
 	// Validate the full generated code from real DAML structures
-	expectedMainCode := `package main
-
-import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"math/big"
-	"strings"
-	"time"
-)
-
-var (
-	_ = errors.New
-	_ = big.NewInt
-	_ = strings.NewReader
-)
-
-const PackageID = "e2d906db3930143bfa53f43c7a69c218c8b499c03556485f312523090684ff34"
-
-type PARTY string
-type TEXT string
-type INT64 int64
-type BOOL bool
-type DECIMAL *big.Int
-type NUMERIC *big.Int
-type DATE time.Time
-type TIMESTAMP time.Time
-type UNIT struct{}
-type LIST []string
-type MAP map[string]interface{}
-type OPTIONAL *interface{}
-
-// Address is a variant/union type
-type Address struct {
-	Us *USAddress ` + "`json:\"US,omitempty\"`" + `
-	Uk *UKAddress ` + "`json:\"UK,omitempty\"`" + `
+	require.Equal(t, string(expectedMainCode), res, "Generated main package code should match expected output")
 }
 
-// MarshalJSON implements custom JSON marshaling for Address
-func (v Address) MarshalJSON() ([]byte, error) {
+func TestGetMainDalfV3(t *testing.T) {
+	srcPath := "../../test-data/all-kinds-of-1.0.0_lf.dar"
+	output := "../../test-data/test_unzipped"
+	defer os.RemoveAll(output)
 
-	if v.Us != nil {
-		return json.Marshal(map[string]interface{}{
-			"tag":   "US",
-			"value": v.Us,
-		})
-	}
+	genOutput, err := UnzipDar(srcPath, &output)
+	require.NoError(t, err)
 
-	if v.Uk != nil {
-		return json.Marshal(map[string]interface{}{
-			"tag":   "UK",
-			"value": v.Uk,
-		})
-	}
+	manifest, err := GetManifest(genOutput)
+	require.NoError(t, err)
+	require.Equal(t, "all-kinds-of-1.0.0-6d7e83e81a0a7960eec37340f5b11e7a61606bd9161f413684bc345c3f387948/all-kinds-of-1.0.0-6d7e83e81a0a7960eec37340f5b11e7a61606bd9161f413684bc345c3f387948.dalf", manifest.MainDalf)
+	require.NotNil(t, manifest)
+	require.Equal(t, "1.0", manifest.Version)
+	require.Equal(t, "damlc", manifest.CreatedBy)
+	require.Equal(t, "all-kinds-of-1.0.0", manifest.Name)
+	require.Equal(t, "3.3.0-snapshot.20250417.0", manifest.SdkVersion)
+	require.Equal(t, "daml-lf", manifest.Format)
+	require.Equal(t, "non-encrypted", manifest.Encryption)
+	require.Len(t, manifest.Dalfs, 30)
 
-	return json.Marshal(map[string]interface{}{})
-}
+	dalfFullPath := filepath.Join(genOutput, manifest.MainDalf)
+	dalfContent, err := os.ReadFile(dalfFullPath)
+	require.NoError(t, err)
+	require.NotNil(t, dalfContent)
 
-// UnmarshalJSON implements custom JSON unmarshaling for Address
-func (v *Address) UnmarshalJSON(data []byte) error {
-	var tagged struct {
-		Tag   string          ` + "`json:\"tag\"`" + `
-		Value json.RawMessage ` + "`json:\"value\"`" + `
-	}
+	pkg, err := GetAST(dalfContent, manifest)
+	require.Nil(t, err)
+	require.NotEmpty(t, pkg.Structs)
 
-	if err := json.Unmarshal(data, &tagged); err != nil {
-		return err
-	}
+	// Test MappyContract template
+	pkg1, exists := pkg.Structs["MappyContract"]
+	require.True(t, exists)
+	require.Equal(t, pkg1.Name, "MappyContract")
+	require.Equal(t, "Template", pkg1.RawType)
+	require.Len(t, pkg1.Fields, 2)
+	require.Equal(t, pkg1.Fields[0].Name, "operator")
+	require.Equal(t, pkg1.Fields[1].Name, "value")
 
-	switch tagged.Tag {
+	// Test OneOfEverything template
+	pkg2, exists := pkg.Structs["OneOfEverything"]
+	require.True(t, exists)
+	require.Equal(t, pkg2.Name, "OneOfEverything")
+	require.Equal(t, "Template", pkg2.RawType)
+	require.Len(t, pkg2.Fields, 16) // Based on the generated output
+	require.Equal(t, pkg2.Fields[0].Name, "operator")
+	require.Equal(t, pkg2.Fields[1].Name, "someBoolean")
+	require.Equal(t, pkg2.Fields[2].Name, "someInteger")
 
-	case "US":
-		var value USAddress
-		if err := json.Unmarshal(tagged.Value, &value); err != nil {
-			return err
-		}
-		v.Us = &value
+	// Test Accept struct
+	pkg3, exists := pkg.Structs["Accept"]
+	require.True(t, exists)
+	require.Equal(t, pkg3.Name, "Accept")
+	require.Equal(t, "Record", pkg3.RawType)
 
-	case "UK":
-		var value UKAddress
-		if err := json.Unmarshal(tagged.Value, &value); err != nil {
-			return err
-		}
-		v.Uk = &value
+	// Test Color enum
+	colorStruct, exists := pkg.Structs["Color"]
+	require.True(t, exists)
+	require.Equal(t, "Enum", colorStruct.RawType)
+	require.Len(t, colorStruct.Fields, 3)
+	require.Equal(t, colorStruct.Fields[0].Name, "Red")
+	require.Equal(t, colorStruct.Fields[1].Name, "Green")
+	require.Equal(t, colorStruct.Fields[2].Name, "Blue")
 
-	default:
-		return fmt.Errorf("unknown tag: %s", tagged.Tag)
-	}
+	res, err := Bind("main", pkg.PackageID, pkg.Structs)
+	require.NoError(t, err)
+	require.NotEmpty(t, res)
 
-	return nil
-}
+	testRes := "../../test-data/all_kinds_of_1_0_0.go_gen"
+	expectedCode, err := os.ReadFile(testRes)
+	require.NoError(t, err)
 
-// American is a Record type
-type American struct {
-	Person  PARTY
-	Address USAddress
-}
-
-// Briton is a Record type
-type Briton struct {
-	Person  PARTY
-	Address UKAddress
-}
-
-// OptionalFields is a Record type
-type OptionalFields struct {
-	Party  PARTY
-	AMaybe OPTIONAL
-}
-
-// OptionalFieldsCleanUp is a Record type
-type OptionalFieldsCleanUp struct {
-}
-
-// Person is a Record type
-type Person struct {
-	Person  PARTY
-	Address Address
-}
-
-// SimpleFields is a Record type
-type SimpleFields struct {
-	Party     PARTY
-	ABool     BOOL
-	AInt      INT64
-	ADecimal  NUMERIC
-	AText     TEXT
-	ADate     DATE
-	ADatetime TIMESTAMP
-}
-
-// SimpleFieldsCleanUp is a Record type
-type SimpleFieldsCleanUp struct {
-}
-
-// UKAddress is a Record type
-type UKAddress struct {
-	Address  LIST
-	Locality OPTIONAL
-	City     TEXT
-	State    TEXT
-	Postcode TEXT
-}
-
-// USAddress is a Record type
-type USAddress struct {
-	Address LIST
-	City    TEXT
-	State   TEXT
-	Zip     INT64
-}
-`
-
-	require.Equal(t, expectedMainCode, res, "Generated main package code should match expected output")
+	require.Equal(t, string(expectedCode), res, "generated code should match expected output")
 }

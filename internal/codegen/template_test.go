@@ -3,21 +3,25 @@ package codegen
 import (
 	"strings"
 	"testing"
+
+	"github.com/noders-team/go-daml/internal/codegen/model"
 )
 
 func TestBind(t *testing.T) {
-	structs := map[string]*tmplStruct{
+	structs := map[string]*model.TmplStruct{
 		"RentalProposal": {
-			Name: "RentalProposal",
-			Fields: []*tmplField{
+			Name:    "RentalProposal",
+			RawType: "Record",
+			Fields: []*model.TmplField{
 				{Name: "landlord", Type: "string"},
 				{Name: "tenant", Type: "string"},
 				{Name: "terms", Type: "string"},
 			},
 		},
 		"RentalAgreement": {
-			Name: "RentalAgreement",
-			Fields: []*tmplField{
+			Name:    "RentalAgreement",
+			RawType: "Record",
+			Fields: []*model.TmplField{
 				{Name: "landlord", Type: "string"},
 				{Name: "tenant", Type: "string"},
 				{Name: "terms", Type: "string"},
@@ -49,6 +53,10 @@ func TestBind(t *testing.T) {
 
 	if !strings.Contains(result, "Landlord string") {
 		t.Error("Generated code does not contain capitalized field names")
+	}
+
+	if !strings.Contains(result, `json:"landlord"`) {
+		t.Error("Generated code does not contain JSON tags with original field names")
 	}
 
 	// Print the result for inspection
