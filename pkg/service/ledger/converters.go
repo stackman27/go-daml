@@ -295,6 +295,41 @@ func mapToValue(data interface{}) *v2.Value {
 		return nil
 	}
 
+	// Handle custom pointer types first before dereferencing
+	switch v := data.(type) {
+	case types.NUMERIC:
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
+	case types.DECIMAL:
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
+	}
+
+	// Handle pointers by dereferencing them
+	if reflect.TypeOf(data).Kind() == reflect.Ptr {
+		val := reflect.ValueOf(data)
+		if val.IsNil() {
+			return nil
+		}
+		return mapToValue(val.Elem().Interface())
+	}
+
+	// Handle custom types before other type checking
+	switch v := data.(type) {
+	case types.INT64:
+		return &v2.Value{Sum: &v2.Value_Int64{Int64: int64(v)}}
+	case types.TEXT:
+		return &v2.Value{Sum: &v2.Value_Text{Text: string(v)}}
+	case types.BOOL:
+		return &v2.Value{Sum: &v2.Value_Bool{Bool: bool(v)}}
+	case types.PARTY:
+		return &v2.Value{Sum: &v2.Value_Party{Party: string(v)}}
+	case types.DATE:
+		return &v2.Value{Sum: &v2.Value_Date{Date: int32((time.Time)(v).Unix() / 86400)}}
+	case types.TIMESTAMP:
+		return &v2.Value{Sum: &v2.Value_Timestamp{Timestamp: int64((time.Time)(v).Unix())}}
+	case types.LIST:
+		return &v2.Value{Sum: &v2.Value_List{List: &v2.List{Elements: mapValues(v)}}}
+	}
+
 	switch v := data.(type) {
 	case bool:
 		return &v2.Value{Sum: &v2.Value_Bool{Bool: v}}
@@ -371,17 +406,9 @@ func mapToValue(data interface{}) *v2.Value {
 			},
 		}
 	case *big.Int:
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: strings.ReplaceAll(convertBigIntToNumeric(v, 10).String(), "/", ".")}}
-	case types.NUMERIC:
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: strings.ReplaceAll(convertBigIntToNumeric((*big.Int)(v), 10).String(), "/", ".")}}
-	case types.DATE:
-		return &v2.Value{Sum: &v2.Value_Date{Date: int32((time.Time)(v).Unix() / 86400)}}
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric(v, 10).FloatString(10)}}
 	case time.Time:
 		return &v2.Value{Sum: &v2.Value_Date{Date: int32(v.Unix() / 86400)}}
-	case types.TIMESTAMP:
-		return &v2.Value{Sum: &v2.Value_Timestamp{Timestamp: int64((time.Time)(v).Unix())}}
-	case types.LIST:
-		return &v2.Value{Sum: &v2.Value_List{List: &v2.List{Elements: mapValues(v)}}}
 	case interface{}:
 		return mapToValue(structToMap(v))
 	default:
@@ -391,8 +418,60 @@ func mapToValue(data interface{}) *v2.Value {
 
 func structToMap(v interface{}) map[string]interface{} {
 	result := make(map[string]interface{})
-	b, _ := json.Marshal(v)
-	json.Unmarshal(b, &result)
+
+	val := reflect.ValueOf(v)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Struct {
+		b, _ := json.Marshal(v)
+		json.Unmarshal(b, &result)
+		return result
+	}
+
+	typ := val.Type()
+	for i := 0; i < val.NumField(); i++ {
+		field := typ.Field(i)
+		fieldValue := val.Field(i)
+
+		if !fieldValue.CanInterface() {
+			continue
+		}
+
+		jsonTag := field.Tag.Get("json")
+		if jsonTag == "" || jsonTag == "-" {
+			continue
+		}
+
+		tagName := jsonTag
+		hasOmitEmpty := false
+		if idx := strings.Index(jsonTag, ","); idx != -1 {
+			tagName = jsonTag[:idx]
+			options := jsonTag[idx+1:]
+			hasOmitEmpty = strings.Contains(options, "omitempty")
+		}
+
+		if tagName == "" {
+			tagName = strings.ToLower(field.Name)
+		}
+
+		actualValue := fieldValue.Interface()
+		if hasOmitEmpty && actualValue == nil {
+			continue
+		}
+
+		if hasOmitEmpty && fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+			continue
+		}
+
+		if hasOmitEmpty && fieldValue.IsZero() && fieldValue.Kind() != reflect.Ptr {
+			continue
+		}
+
+		result[tagName] = actualValue
+	}
+
 	return result
 }
 

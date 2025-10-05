@@ -244,7 +244,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		SomeBoolean:     true,
 		SomeInteger:     190,
 		SomeDecimal:     NUMERIC(big.NewInt(200)),
-		SomeMeasurement: NUMERIC(big.NewInt(300)), // This demonstrates the NUMERIC nil handling fix
+		SomeMeasurement: NUMERIC(big.NewInt(300)),
 		SomeDate:        DATE(time.Now().UTC()),
 		SomeDatetime:    TIMESTAMP(time.Now().UTC()),
 		SomeSimpleList:  LIST(someList),
@@ -293,7 +293,6 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	}
 	log.Info().Msgf("response.UpdateID: %s", response.UpdateID)
 
-	// time.Sleep(5 * time.Second)
 	respUpd, err := cl.UpdateService.GetTransactionByID(ctx, &model.GetTransactionByIDRequest{
 		UpdateID:          response.UpdateID,
 		RequestingParties: []string{party},
