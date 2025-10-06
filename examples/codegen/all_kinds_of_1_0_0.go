@@ -106,7 +106,7 @@ type OneOfEverything struct {
 	SomeText        TEXT      `json:"someText"`
 	SomeDate        DATE      `json:"someDate"`
 	SomeDatetime    TIMESTAMP `json:"someDatetime"`
-	SomeSimpleList  LIST      `json:"someSimpleList"`
+	SomeSimpleList  []INT64   `json:"someSimpleList"`
 	SomeSimplePair  MyPair    `json:"someSimplePair"`
 	SomeNestedPair  MyPair    `json:"someNestedPair"`
 	SomeUglyNesting VPair     `json:"someUglyNesting"`
@@ -202,9 +202,9 @@ func (t OneOfEverything) Accept(contractID string, args Accept) *model.ExerciseC
 
 // VPair is a variant/union type
 type VPair struct {
-	Left  *interface{} `json:"Left,omitempty"`
-	Right *interface{} `json:"Right,omitempty"`
-	Both  *VPair       `json:"Both,omitempty"`
+	Left  interface{} `json:"Left,omitempty"`
+	Right interface{} `json:"Right,omitempty"`
+	Both  *VPair      `json:"Both,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for VPair

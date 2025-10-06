@@ -11,6 +11,7 @@ import (
 
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/noders-team/go-daml/pkg/types"
 	. "github.com/noders-team/go-daml/pkg/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -234,9 +235,9 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		}
 	}
 
-	someList := []string{"a", "b", "c"}
-	left := interface{}("a")
-	right := interface{}("b")
+	someListInt := []types.INT64{1, 2, 3}
+	left := interface{}(INT64(100))
+	right := interface{}(INT64(200))
 	leftInterface := left
 	rightInterface := right
 	mappyContract := OneOfEverything{
@@ -247,11 +248,18 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		SomeMeasurement: NUMERIC(big.NewInt(300)),
 		SomeDate:        DATE(time.Now().UTC()),
 		SomeDatetime:    TIMESTAMP(time.Now().UTC()),
-		SomeSimpleList:  LIST(someList),
+		SomeSimpleList:  someListInt,
 		SomeSimplePair:  MyPair{Left: INT64(100), Right: INT64(200)},
-		SomeNestedPair:  MyPair{Left: MyPair{Left: INT64(10), Right: INT64(20)}, Right: INT64(30)},
-		SomeUglyNesting: VPair{Both: &VPair{Left: &leftInterface, Right: &rightInterface}, Left: &leftInterface, Right: &rightInterface},
-		SomeText:        "some text",
+		SomeNestedPair: MyPair{
+			Left:  MyPair{Left: INT64(10), Right: INT64(20)},
+			Right: MyPair{Left: INT64(30), Right: INT64(40)},
+		},
+		SomeUglyNesting: VPair{
+			Both: &VPair{ // TODO not working here
+				Left: &leftInterface, Right: &rightInterface},
+			Left:  &leftInterface,
+			Right: &rightInterface},
+		SomeText: "some text",
 	}
 
 	contractIDs, err := createContract(ctx, party, cl, mappyContract)

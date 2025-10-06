@@ -298,9 +298,21 @@ func mapToValue(data interface{}) *v2.Value {
 	// Handle custom pointer types first before dereferencing
 	switch v := data.(type) {
 	case types.NUMERIC:
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: strings.ReplaceAll(convertBigIntToNumeric((*big.Int)(v), 10).String(), "/", ".")}}
 	case types.DECIMAL:
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: strings.ReplaceAll(convertBigIntToNumeric((*big.Int)(v), 10).String(), "/", ".")}}
+	case *big.Int:
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: strings.ReplaceAll(convertBigIntToNumeric(v, 10).String(), "/", ".")}}
+	case []types.INT64:
+		elements := make([]*v2.Value, len(v))
+		for i, elem := range v {
+			elements[i] = mapToValue(elem)
+		}
+		return &v2.Value{
+			Sum: &v2.Value_List{
+				List: &v2.List{Elements: elements},
+			},
+		}
 	}
 
 	// Handle pointers by dereferencing them
@@ -406,7 +418,7 @@ func mapToValue(data interface{}) *v2.Value {
 			},
 		}
 	case *big.Int:
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric(v, 10).FloatString(10)}}
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: strings.ReplaceAll(convertBigIntToNumeric(v, 10).String(), "/", ".")}}
 	case time.Time:
 		return &v2.Value{Sum: &v2.Value_Date{Date: int32(v.Unix() / 86400)}}
 	case interface{}:
