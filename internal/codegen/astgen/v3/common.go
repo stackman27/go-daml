@@ -12,12 +12,14 @@ import (
 )
 
 const (
-	RawTypeTemplate  = "Template"
-	RawTypeOptional  = "OPTIONAL"
-	RawTypeInterface = "Interface"
-	RawTypeRecord    = "Record"
-	RawTypeVariant   = "Variant"
-	RawTypeEnum      = "Enum"
+	RawTypeTemplate   = "Template"
+	RawTypeOptional   = "OPTIONAL"
+	RawTypeInterface  = "Interface"
+	RawTypeRecord     = "Record"
+	RawTypeVariant    = "Variant"
+	RawTypeEnum       = "Enum"
+	RawTypeContractID = "CONTRACT_ID"
+	RawTypeList       = "LIST"
 )
 
 type codeGenAst struct {
@@ -429,7 +431,6 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, builtinType *daml.Type
 	builtinName := builtinType.Builtin.String()
 	log.Debug().Msgf("handleBuiltinType: builtin=%s, args=%d", builtinName, len(builtinType.Args))
 
-	// Handle parameterized types like LIST
 	switch builtinType.Builtin {
 	case daml.BuiltinType_LIST:
 		if len(builtinType.Args) > 0 {
@@ -437,14 +438,16 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, builtinType *daml.Type
 			normalizedElementType := model.NormalizeDAMLType(elementType)
 			return "[]" + normalizedElementType
 		}
-		return "LIST" // fallback to generic LIST
+		return RawTypeList // fallback to generic LIST
 	case daml.BuiltinType_OPTIONAL:
 		if len(builtinType.Args) > 0 {
 			elementType := c.extractType(pkg, builtinType.Args[0])
 			normalizedElementType := model.NormalizeDAMLType(elementType)
 			return "*" + normalizedElementType
 		}
-		return "OPTIONAL" // fallback to generic OPTIONAL
+		return RawTypeOptional // fallback to generic OPTIONAL
+	case daml.BuiltinType_CONTRACT_ID:
+		return RawTypeContractID
 	default:
 		return builtinName
 	}

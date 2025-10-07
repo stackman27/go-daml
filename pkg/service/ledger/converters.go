@@ -384,6 +384,8 @@ func mapToValue(data interface{}) *v2.Value {
 		return &v2.Value{Sum: &v2.Value_Bool{Bool: bool(v)}}
 	case types.PARTY:
 		return &v2.Value{Sum: &v2.Value_Party{Party: string(v)}}
+	case types.CONTRACT_ID:
+		return &v2.Value{Sum: &v2.Value_ContractId{ContractId: string(v)}}
 	case types.DATE:
 		return &v2.Value{Sum: &v2.Value_Date{Date: int32((time.Time)(v).Unix() / 86400)}}
 	case types.TIMESTAMP:

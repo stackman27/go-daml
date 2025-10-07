@@ -316,4 +316,55 @@ func TestConvertToRecord(t *testing.T) {
 		require.Equal(t, int64(456), fieldMap["regularInt"].Value.GetInt64())
 		require.Equal(t, "regular", fieldMap["regularText"].Value.GetText())
 	})
+
+	t.Run("CONTRACT_ID type conversion", func(t *testing.T) {
+		contractID := types.CONTRACT_ID("00000123456789abcdef")
+
+		data := make(map[string]interface{})
+		data["contractId"] = contractID
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "contractId", record.Fields[0].Label)
+
+		contractIdValue := record.Fields[0].Value.GetContractId()
+		require.Equal(t, "00000123456789abcdef", contractIdValue)
+	})
+
+	t.Run("CONTRACT_ID in struct", func(t *testing.T) {
+		type TestContractStruct struct {
+			Owner      types.PARTY       `json:"owner"`
+			ContractID types.CONTRACT_ID `json:"contractId"`
+			Name       types.TEXT        `json:"name"`
+		}
+
+		testData := TestContractStruct{
+			Owner:      types.PARTY("alice"),
+			ContractID: types.CONTRACT_ID("00000123456789abcdef"),
+			Name:       types.TEXT("test contract"),
+		}
+
+		data := make(map[string]interface{})
+		data["testStruct"] = testData
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		structRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, structRecord)
+		require.Len(t, structRecord.Fields, 3)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range structRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
+		require.Equal(t, "00000123456789abcdef", fieldMap["contractId"].Value.GetContractId())
+		require.Equal(t, "test contract", fieldMap["name"].Value.GetText())
+	})
 }
