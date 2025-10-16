@@ -48,8 +48,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 }
 
 // Accept is a Record type
-type Accept struct {
-}
+type Accept struct{}
 
 // toMap converts Accept to a map for DAML arguments
 func (t Accept) toMap() map[string]interface{} {
@@ -93,7 +92,7 @@ func (t MappyContract) GetTemplateID() string {
 func (t MappyContract) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	args["operator"] = map[string]interface{}{"_type": "party", "value": string(t.Operator)}
+	args["operator"] = t.Operator.ToMap()
 
 	if t.Value != nil && len(t.Value) > 0 {
 		args["value"] = map[string]interface{}{"_type": "genmap", "value": t.Value}
@@ -126,7 +125,6 @@ type MyPair struct {
 // toMap converts MyPair to a map for DAML arguments
 func (t MyPair) toMap() map[string]interface{} {
 	return map[string]interface{}{
-
 		"left":  t.Left,
 		"right": t.Right,
 	}
@@ -161,7 +159,7 @@ func (t OneOfEverything) GetTemplateID() string {
 func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	args["operator"] = map[string]interface{}{"_type": "party", "value": string(t.Operator)}
+	args["operator"] = t.Operator.ToMap()
 
 	args["someBoolean"] = bool(t.SomeBoolean)
 
@@ -254,7 +252,6 @@ type VPair struct {
 
 // MarshalJSON implements custom JSON marshaling for VPair
 func (v VPair) MarshalJSON() ([]byte, error) {
-
 	if v.Left != nil {
 		return json.Marshal(map[string]interface{}{
 			"tag":   "Left",
@@ -322,7 +319,6 @@ func (v *VPair) UnmarshalJSON(data []byte) error {
 
 // GetVariantTag implements types.VARIANT interface
 func (v VPair) GetVariantTag() string {
-
 	if v.Left != nil {
 		return "Left"
 	}
@@ -340,7 +336,6 @@ func (v VPair) GetVariantTag() string {
 
 // GetVariantValue implements types.VARIANT interface
 func (v VPair) GetVariantValue() interface{} {
-
 	if v.Left != nil {
 		return v.Left
 	}

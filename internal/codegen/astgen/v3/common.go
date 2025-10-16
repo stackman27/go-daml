@@ -74,10 +74,10 @@ func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) 
 		if len(damlLf.InternedStrings) == 0 {
 			continue
 		}
-		
+
 		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
 		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
-		
+
 		interfaces, err := c.getInterfaces(damlLf, module, moduleName)
 		if err != nil {
 			return nil, err
@@ -212,7 +212,7 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 					interfaceName := c.getName(pkg, impl.Interface.GetNameInternedDname())
 					tmplStruct.Implements = append(tmplStruct.Implements, interfaceName)
 					log.Debug().Msgf("template %s implements interface: %s", templateName, interfaceName)
-					
+
 					// Add interface choices to the template
 					if interfaceStruct, exists := interfaces[interfaceName]; exists {
 						for _, ifaceChoice := range interfaceStruct.Choices {

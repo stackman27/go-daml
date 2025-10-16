@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	interfaces "github.com/noders-team/go-daml/examples/codegen/interfaces"
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/errors"
 	"github.com/noders-team/go-daml/pkg/model"
@@ -355,6 +356,111 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	}
 }
 
+func TestAmuletsTransfer(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	log.Info().Str("interfacePackageID", interfaces.PackageID).Msg("Using interface package ID")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	builder := client.NewDamlClient(bearerToken, grpcAddress)
+	if strings.HasSuffix(grpcAddress, ":443") {
+		tlsConfig := client.TlsConfig{}
+		builder = builder.WithTLSConfig(tlsConfig)
+	}
+
+	cl, err := builder.Build(context.Background())
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to build DAML client")
+	}
+
+	if err = cl.Ping(ctx); err != nil {
+		log.Fatal().Err(err).Msg("failed to ping DAML client")
+	}
+
+	uploadedPackageName := "amulets-interface-test"
+	err = packageUploadWithPath(ctx, uploadedPackageName, interfaceDarPath, interfaces.PackageID, cl)
+	if err != nil {
+		log.Panic().Msgf("error: %v", err)
+	}
+
+	party := ""
+	users, err := cl.UserMng.ListUsers(ctx)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to list users")
+	}
+	for _, u := range users {
+		if u.ID == user {
+			party = u.PrimaryParty
+			log.Info().Msgf("user %s has primary party %s, using it", u.ID, u.PrimaryParty)
+		}
+	}
+
+	assetContract := interfaces.Asset{
+		Owner: PARTY(party),
+		Name:  TEXT("Test Asset"),
+		Value: INT64(100),
+	}
+
+	contractIDs, err := createContract(ctx, party, cl, assetContract)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create Asset contract")
+	}
+
+	require.Greater(t, len(contractIDs), 0, "Expected at least one contract to be created")
+	assetContractID := contractIDs[0]
+	log.Info().Str("assetContractID", assetContractID).Msg("Created Asset contract")
+
+	transferArgs := interfaces.Transfer{NewOwner: PARTY(party)}
+	transferCmd := assetContract.Transfer(assetContractID, transferArgs)
+
+	transferSubmissionReq := &model.SubmitAndWaitRequest{
+		Commands: &model.Commands{
+			WorkflowID:   "transfer-workflow-" + time.Now().Format("20060102150405"),
+			CommandID:    "transfer-" + time.Now().Format("20060102150405"),
+			ActAs:        []string{party},
+			SubmissionID: "transfer-sub-" + time.Now().Format("20060102150405"),
+			DeduplicationPeriod: model.DeduplicationDuration{
+				Duration: 60 * time.Second,
+			},
+			Commands: []*model.Command{{Command: transferCmd}},
+		},
+	}
+
+	transferResponse, err := cl.CommandService.SubmitAndWait(ctx, transferSubmissionReq)
+	require.NoError(t, err, "Transfer command should succeed")
+	log.Info().Str("updateID", transferResponse.UpdateID).Msg("Transfer executed successfully")
+
+	newContractIDs, err := getContractIDsFromUpdate(ctx, party, transferResponse.UpdateID, cl)
+	require.NoError(t, err, "Should be able to get contract IDs from transfer transaction")
+	require.Greater(t, len(newContractIDs), 0, "Transfer should create at least one contract")
+
+	newAssetContractID := newContractIDs[0]
+	log.Info().Str("newAssetContractID", newAssetContractID).Msg("Got new Asset contract from Transfer")
+
+	archiveCmd := assetContract.Archive(newAssetContractID)
+
+	archiveSubmissionReq := &model.SubmitAndWaitRequest{
+		Commands: &model.Commands{
+			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
+			CommandID:    "archive-" + time.Now().Format("20060102150405"),
+			ActAs:        []string{party},
+			SubmissionID: "archive-sub-" + time.Now().Format("20060102150405"),
+			DeduplicationPeriod: model.DeduplicationDuration{
+				Duration: 60 * time.Second,
+			},
+			Commands: []*model.Command{{Command: archiveCmd}},
+		},
+	}
+
+	archiveResponse, err := cl.CommandService.SubmitAndWait(ctx, archiveSubmissionReq)
+	require.NoError(t, err, "Archive command should succeed")
+	log.Info().Str("updateID", archiveResponse.UpdateID).Msg("Archive executed successfully")
+
+	log.Info().Msg("TestAmuletsTransfer completed successfully")
+}
+
 func packageUpload(ctx context.Context, uploadedPackageName string, cl *client.DamlBindingClient) error {
 	return packageUploadWithPath(ctx, uploadedPackageName, darFilePath, PackageID, cl)
 }
@@ -487,116 +593,4 @@ func getContractIDsFromUpdate(ctx context.Context, party, updateID string, cl *c
 	}
 
 	return contractIDs, nil
-}
-
-func TestAmuletsTransfer(t *testing.T) {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
-	log.Info().Str("interfacePackageID", InterfacePackageID).Msg("Using interface package ID")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Reuse client setup from existing tests
-	builder := client.NewDamlClient(bearerToken, grpcAddress)
-	if strings.HasSuffix(grpcAddress, ":443") {
-		tlsConfig := client.TlsConfig{}
-		builder = builder.WithTLSConfig(tlsConfig)
-	}
-
-	cl, err := builder.Build(context.Background())
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to build DAML client")
-	}
-
-	if err = cl.Ping(ctx); err != nil {
-		log.Fatal().Err(err).Msg("failed to ping DAML client")
-	}
-
-	// Upload interface package using existing pattern
-	uploadedPackageName := "amulets-interface-test"
-	err = packageUploadWithPath(ctx, uploadedPackageName, interfaceDarPath, InterfacePackageID, cl)
-	if err != nil {
-		log.Panic().Msgf("error: %v", err)
-	}
-
-	// Reuse party and rights setup
-	party := ""
-	users, err := cl.UserMng.ListUsers(ctx)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to list users")
-	}
-	for _, u := range users {
-		if u.ID == user {
-			party = u.PrimaryParty
-			log.Info().Msgf("user %s has primary party %s, using it", u.ID, u.PrimaryParty)
-		}
-	}
-
-	// Create Asset contract
-	assetContract := Asset{
-		Owner: PARTY(party),
-		Name:  TEXT("Test Asset"),
-		Value: INT64(100),
-	}
-
-	contractIDs, err := createContract(ctx, party, cl, assetContract)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create Asset contract")
-	}
-
-	require.Greater(t, len(contractIDs), 0, "Expected at least one contract to be created")
-	assetContractID := contractIDs[0]
-	log.Info().Str("assetContractID", assetContractID).Msg("Created Asset contract")
-
-	// Test Transfer choice - use the same party for simplicity in the test
-	transferArgs := Transfer{NewOwner: PARTY(party)}
-	transferCmd := assetContract.Transfer(assetContractID, transferArgs)
-
-	transferSubmissionReq := &model.SubmitAndWaitRequest{
-		Commands: &model.Commands{
-			WorkflowID:   "transfer-workflow-" + time.Now().Format("20060102150405"),
-			CommandID:    "transfer-" + time.Now().Format("20060102150405"),
-			ActAs:        []string{party},
-			SubmissionID: "transfer-sub-" + time.Now().Format("20060102150405"),
-			DeduplicationPeriod: model.DeduplicationDuration{
-				Duration: 60 * time.Second,
-			},
-			Commands: []*model.Command{{Command: transferCmd}},
-		},
-	}
-
-	transferResponse, err := cl.CommandService.SubmitAndWait(ctx, transferSubmissionReq)
-	require.NoError(t, err, "Transfer command should succeed")
-	log.Info().Str("updateID", transferResponse.UpdateID).Msg("Transfer executed successfully")
-
-	// Get the new contract ID from the transfer transaction
-	newContractIDs, err := getContractIDsFromUpdate(ctx, party, transferResponse.UpdateID, cl)
-	require.NoError(t, err, "Should be able to get contract IDs from transfer transaction")
-	require.Greater(t, len(newContractIDs), 0, "Transfer should create at least one contract")
-	
-	newAssetContractID := newContractIDs[0]
-	log.Info().Str("newAssetContractID", newAssetContractID).Msg("Got new Asset contract from Transfer")
-
-	// Test Archive choice on the new contract
-	archiveCmd := assetContract.Archive(newAssetContractID)
-
-	archiveSubmissionReq := &model.SubmitAndWaitRequest{
-		Commands: &model.Commands{
-			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
-			CommandID:    "archive-" + time.Now().Format("20060102150405"),
-			ActAs:        []string{party},
-			SubmissionID: "archive-sub-" + time.Now().Format("20060102150405"),
-			DeduplicationPeriod: model.DeduplicationDuration{
-				Duration: 60 * time.Second,
-			},
-			Commands: []*model.Command{{Command: archiveCmd}},
-		},
-	}
-
-	archiveResponse, err := cl.CommandService.SubmitAndWait(ctx, archiveSubmissionReq)
-	require.NoError(t, err, "Archive command should succeed")
-	log.Info().Str("updateID", archiveResponse.UpdateID).Msg("Archive executed successfully")
-
-	log.Info().Msg("TestAmuletsTransfer completed successfully")
 }

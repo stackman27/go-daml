@@ -1,4 +1,4 @@
-package codegen_test
+package interfaces_test
 
 import (
 	"errors"
@@ -16,16 +16,43 @@ var (
 	_ = strings.NewReader
 )
 
-const InterfacePackageID = "8f919735d2daa1abb780808ad1fed686fc9229a039dc659ccb04e5fd5d071c90"
+const PackageID = "8f919735d2daa1abb780808ad1fed686fc9229a039dc659ccb04e5fd5d071c90"
+
+type Template interface {
+	CreateCommand() *model.CreateCommand
+	GetTemplateID() string
+}
 
 // Transferable is a DAML interface
 type Transferable interface {
-
 	// Archive executes the Archive choice
 	Archive(contractID string) *model.ExerciseCommand
 
 	// Transfer executes the Transfer choice
 	Transfer(contractID string, args Transfer) *model.ExerciseCommand
+}
+
+func argsToMap(args interface{}) map[string]interface{} {
+	if args == nil {
+		return map[string]interface{}{}
+	}
+
+	if m, ok := args.(map[string]interface{}); ok {
+		return m
+	}
+
+	// Check if the type has a toMap method
+	type mapper interface {
+		toMap() map[string]interface{}
+	}
+
+	if mapper, ok := args.(mapper); ok {
+		return mapper.toMap()
+	}
+
+	return map[string]interface{}{
+		"args": args,
+	}
 }
 
 // Asset is a Template type
@@ -37,14 +64,14 @@ type Asset struct {
 
 // GetTemplateID returns the template ID for this template
 func (t Asset) GetTemplateID() string {
-	return fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Asset")
+	return fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Asset")
 }
 
 // CreateCommand returns a CreateCommand for this template
 func (t Asset) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	args["owner"] = map[string]interface{}{"_type": "party", "value": string(t.Owner)}
+	args["owner"] = t.Owner.ToMap()
 
 	args["name"] = string(t.Name)
 
@@ -61,7 +88,7 @@ func (t Asset) CreateCommand() *model.CreateCommand {
 // Archive exercises the Archive choice on this Asset contract
 func (t Asset) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Asset"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Asset"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -71,7 +98,7 @@ func (t Asset) Archive(contractID string) *model.ExerciseCommand {
 // AssetTransfer exercises the AssetTransfer choice on this Asset contract
 func (t Asset) AssetTransfer(contractID string, args AssetTransfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Asset"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Asset"),
 		ContractID: contractID,
 		Choice:     "AssetTransfer",
 		Arguments:  argsToMap(args),
@@ -81,7 +108,7 @@ func (t Asset) AssetTransfer(contractID string, args AssetTransfer) *model.Exerc
 // Transfer exercises the Transfer choice on this Asset contract via the Transferable interface
 func (t Asset) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Transferable"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Transferable"),
 		ContractID: contractID,
 		Choice:     "Transfer",
 		Arguments:  argsToMap(args),
@@ -100,8 +127,7 @@ type AssetTransfer struct {
 // toMap converts AssetTransfer to a map for DAML arguments
 func (t AssetTransfer) toMap() map[string]interface{} {
 	return map[string]interface{}{
-
-		"newOwner": map[string]interface{}{"_type": "party", "value": string(t.NewOwner)},
+		"newOwner": t.NewOwner.ToMap(),
 	}
 }
 
@@ -114,16 +140,16 @@ type Token struct {
 
 // GetTemplateID returns the template ID for this template
 func (t Token) GetTemplateID() string {
-	return fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Token")
+	return fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Token")
 }
 
 // CreateCommand returns a CreateCommand for this template
 func (t Token) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	args["issuer"] = map[string]interface{}{"_type": "party", "value": string(t.Issuer)}
+	args["issuer"] = t.Issuer.ToMap()
 
-	args["owner"] = map[string]interface{}{"_type": "party", "value": string(t.Owner)}
+	args["owner"] = t.Owner.ToMap()
 
 	if t.Amount != nil {
 		args["amount"] = (*big.Int)(t.Amount)
@@ -140,7 +166,7 @@ func (t Token) CreateCommand() *model.CreateCommand {
 // Archive exercises the Archive choice on this Token contract
 func (t Token) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Token"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Token"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -150,7 +176,7 @@ func (t Token) Archive(contractID string) *model.ExerciseCommand {
 // Transfer exercises the Transfer choice on this Token contract via the Transferable interface
 func (t Token) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Transferable"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Transferable"),
 		ContractID: contractID,
 		Choice:     "Transfer",
 		Arguments:  argsToMap(args),
@@ -169,8 +195,7 @@ type Transfer struct {
 // toMap converts Transfer to a map for DAML arguments
 func (t Transfer) toMap() map[string]interface{} {
 	return map[string]interface{}{
-
-		"newOwner": map[string]interface{}{"_type": "party", "value": string(t.NewOwner)},
+		"newOwner": t.NewOwner.ToMap(),
 	}
 }
 
@@ -182,7 +207,6 @@ type TransferableView struct {
 // toMap converts TransferableView to a map for DAML arguments
 func (t TransferableView) toMap() map[string]interface{} {
 	return map[string]interface{}{
-
-		"owner": map[string]interface{}{"_type": "party", "value": string(t.Owner)},
+		"owner": t.Owner.ToMap(),
 	}
 }
