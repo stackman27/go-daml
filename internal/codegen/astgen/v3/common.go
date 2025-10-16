@@ -205,7 +205,6 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 			}
 		}
 
-		// Extract implemented interfaces and add interface choices
 		if len(template.Implements) > 0 {
 			for _, impl := range template.Implements {
 				if impl.Interface != nil {
@@ -213,10 +212,8 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 					tmplStruct.Implements = append(tmplStruct.Implements, interfaceName)
 					log.Debug().Msgf("template %s implements interface: %s", templateName, interfaceName)
 
-					// Add interface choices to the template
 					if interfaceStruct, exists := interfaces[interfaceName]; exists {
 						for _, ifaceChoice := range interfaceStruct.Choices {
-							// Check if this choice is not already in the template
 							found := false
 							for _, tmplChoice := range tmplStruct.Choices {
 								if tmplChoice.Name == ifaceChoice.Name {
@@ -225,7 +222,6 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 								}
 							}
 							if !found {
-								// Clone the interface choice for this template
 								tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
 									Name:          ifaceChoice.Name,
 									ArgType:       ifaceChoice.ArgType,
