@@ -195,16 +195,24 @@ func createdEventFromProto(pb *v2.CreatedEvent) *model.CreatedEvent {
 	}
 
 	event := &model.CreatedEvent{
-		ContractID:  pb.ContractId,
-		TemplateID:  pb.TemplateId.String(),
-		Signatories: pb.Signatories,
-		Observers:   pb.Observers,
+		Offset:           pb.Offset,
+		NodeID:           pb.NodeId,
+		ContractID:       pb.ContractId,
+		CreatedEventBlob: pb.CreatedEventBlob,
+		WitnessParties:   pb.WitnessParties,
+		Signatories:      pb.Signatories,
+		Observers:        pb.Observers,
+		PackageName:      pb.PackageName,
 	}
 
-	// Convert proto Values to map[string]interface{}
+	if pb.TemplateId != nil {
+		event.TemplateID = identifierToString(pb.TemplateId)
+	}
+
 	if pb.CreateArguments != nil {
 		event.CreateArguments = valueFromRecord(pb.CreateArguments)
 	}
+
 	if pb.ContractKey != nil {
 		if key := valueFromProto(pb.ContractKey); key != nil {
 			if m, ok := key.(map[string]interface{}); ok {
@@ -213,7 +221,44 @@ func createdEventFromProto(pb *v2.CreatedEvent) *model.CreatedEvent {
 		}
 	}
 
+	if pb.CreatedAt != nil {
+		t := pb.CreatedAt.AsTime()
+		event.CreatedAt = &t
+	}
+
+	if len(pb.InterfaceViews) > 0 {
+		event.InterfaceViews = make([]*model.InterfaceView, len(pb.InterfaceViews))
+		for i, iv := range pb.InterfaceViews {
+			event.InterfaceViews[i] = interfaceViewFromProto(iv)
+		}
+	}
+
 	return event
+}
+
+func interfaceViewFromProto(pb *v2.InterfaceView) *model.InterfaceView {
+	if pb == nil {
+		return nil
+	}
+
+	view := &model.InterfaceView{}
+
+	if pb.InterfaceId != nil {
+		view.InterfaceID = identifierToString(pb.InterfaceId)
+	}
+
+	if pb.ViewStatus != nil {
+		view.ViewStatus = &model.ViewStatus{
+			Code:    pb.ViewStatus.Code,
+			Message: pb.ViewStatus.Message,
+		}
+	}
+
+	if pb.ViewValue != nil {
+		view.ViewValue = valueFromRecord(pb.ViewValue)
+	}
+
+	return view
 }
 
 func archivedEventFromProto(pb *v2.ArchivedEvent) *model.ArchivedEvent {
@@ -221,10 +266,23 @@ func archivedEventFromProto(pb *v2.ArchivedEvent) *model.ArchivedEvent {
 		return nil
 	}
 
-	return &model.ArchivedEvent{
-		ContractID: pb.ContractId,
-		TemplateID: pb.TemplateId.String(),
+	event := &model.ArchivedEvent{
+		Offset:         pb.Offset,
+		NodeID:         pb.NodeId,
+		ContractID:     pb.ContractId,
+		WitnessParties: pb.WitnessParties,
+		PackageName:    pb.PackageName,
 	}
+
+	if pb.TemplateId != nil {
+		event.TemplateID = identifierToString(pb.TemplateId)
+	}
+
+	for _, iface := range pb.ImplementedInterfaces {
+		event.ImplementedInterfaces = append(event.ImplementedInterfaces, identifierToString(iface))
+	}
+
+	return event
 }
 
 func convertBigIntToNumeric(i *big.Int, scale int) *big.Rat {
