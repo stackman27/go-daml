@@ -1,13 +1,9 @@
 package codegen_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
-	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -26,7 +22,6 @@ import (
 
 const (
 	grpcAddress      = "localhost:3901"
-	jsonAddress      = "http://localhost:3903"
 	bearerToken      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJodHRwczovL2NhbnRvbi5uZXR3b3JrLmdsb2JhbCIsInN1YiI6ImxlZGdlci1hcGktdXNlciJ9.A0VZW69lWWNVsjZmDDpVvr1iQ_dJLga3f-K2bicdtsc"
 	darFilePath      = "../../test-data/all-kinds-of-1.0.0.dar"
 	interfaceDarPath = "../../test-data/amulets-interface-test-1.0.0.dar"
@@ -115,48 +110,6 @@ func TestCodegenIntegration(t *testing.T) {
 	marshalled, err := mappyContract.MarshalJSON()
 	require.NoError(t, err)
 	log.Info().Msgf("marshalled: %s", string(marshalled))
-
-	// WorkflowID:   "create-contracts-" + time.Now().Format("20060102150405"),
-	//		CommandID:    "create-" + time.Now().Format("20060102150405"),
-	//		ActAs:        []string{party},
-	//		SubmissionID: "create-sub-" + time.Now().Format("20060102150405"),
-	//		DeduplicationPeriod: model.DeduplicationDuration{
-	//			Duration: 60 * time.Second,
-	//		},
-
-	tmlID := mappyContract.GetTemplateID()
-	body := map[string]interface{}{
-		"commands": map[string]interface{}{
-			"workflowId":   "my-app",
-			"commandId":    "cmd-001",
-			"actAs":        []string{party},
-			"submissionID": "create-sub-" + time.Now().Format("20060102150405"),
-			"commands": []interface{}{
-				map[string]interface{}{
-					"CreateCommand": map[string]interface{}{
-						"template_id": tmlID,
-						"arguments":   string(marshalled),
-					},
-				},
-			},
-		},
-	}
-
-	// Encode JSON
-	jsonBody, err := json.Marshal(body)
-	require.NoError(t, err)
-	req, err := http.NewRequest("POST", jsonAddress+"/v2/commands/submit-and-wait", bytes.NewBuffer(jsonBody))
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+bearerToken)
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
-	fmt.Printf("Status: %s\n", resp.Status) // TODO
-	fmt.Printf("Response:\n%s\n", string(respBody))
-	//-
 
 	contractIDs, err := createContract(ctx, party, cl, mappyContract)
 	if err != nil {
