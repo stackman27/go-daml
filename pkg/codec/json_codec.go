@@ -568,6 +568,11 @@ func (codec *JsonCodec) assignBigIntValue(jsonValue interface{}, target reflect.
 		}
 		return fmt.Errorf("invalid string format for %s: %s", typeName, v)
 	case float64:
+		if v == float64(int64(v)) {
+			bi := big.NewInt(int64(v))
+			target.Set(converter(bi))
+			return nil
+		}
 		rat := new(big.Rat).SetFloat64(v)
 		scaledInt := new(big.Int)
 		scaledInt.Mul(rat.Num(), big.NewInt(10000000000))

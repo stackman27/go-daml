@@ -314,7 +314,13 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 				if !ok {
 					return
 				}
-				log.Info().Msgf("update: %#+v", upd)
+				if upd.Update.Transaction != nil {
+					log.Info().Str("updateID", upd.Update.Transaction.UpdateID).Str("workflowID", upd.Update.Transaction.WorkflowID).Int("events", len(upd.Update.Transaction.Events)).Msg("received transaction update")
+				} else if upd.Update.Reassignment != nil {
+					log.Info().Str("updateID", upd.Update.Reassignment.UpdateID).Msg("received reassignment update")
+				} else if upd.Update.OffsetCheckpoint != nil {
+					log.Info().Int64("offset", upd.Update.OffsetCheckpoint.Offset).Msg("received offset checkpoint")
+				}
 			case err := <-errRes:
 				log.Fatal().Err(err).Msg("failed to get updates")
 			}
