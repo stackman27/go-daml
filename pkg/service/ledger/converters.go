@@ -146,12 +146,18 @@ func filtersToProto(filters *model.Filters) *v2.Filters {
 
 	pbFilters := &v2.Filters{}
 
-	// Convert template filters to cumulative filters
 	if filters.Inclusive != nil {
 		for _, tf := range filters.Inclusive.TemplateFilters {
 			pbFilters.Cumulative = append(pbFilters.Cumulative, &v2.CumulativeFilter{
 				IdentifierFilter: &v2.CumulativeFilter_TemplateFilter{
 					TemplateFilter: templateFilterToProto(tf),
+				},
+			})
+		}
+		for _, iface := range filters.Inclusive.InterfaceFilters {
+			pbFilters.Cumulative = append(pbFilters.Cumulative, &v2.CumulativeFilter{
+				IdentifierFilter: &v2.CumulativeFilter_InterfaceFilter{
+					InterfaceFilter: interfaceFilterToProto(iface),
 				},
 			})
 		}
@@ -173,6 +179,23 @@ func templateFilterToProto(tf *model.TemplateFilter) *v2.TemplateFilter {
 			EntityName: entityName,
 		},
 		IncludeCreatedEventBlob: tf.IncludeCreatedEventBlob,
+	}
+}
+
+func interfaceFilterToProto(iface *model.InterfaceFilter) *v2.InterfaceFilter {
+	if iface == nil {
+		return nil
+	}
+
+	packageID, moduleName, entityName := parseTemplateID(iface.InterfaceID)
+	return &v2.InterfaceFilter{
+		InterfaceId: &v2.Identifier{
+			PackageId:  packageID,
+			ModuleName: moduleName,
+			EntityName: entityName,
+		},
+		IncludeInterfaceView:    iface.IncludeInterfaceView,
+		IncludeCreatedEventBlob: iface.IncludeCreatedEventBlob,
 	}
 }
 
