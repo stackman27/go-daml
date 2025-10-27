@@ -93,6 +93,10 @@ func NormalizeDAMLType(damlType string) string {
 		return "ROUNDING_MODE"
 	case strings.Contains(damlType, "prim:ANY") || damlType == "ANY":
 		return "ANY"
+	case strings.Contains(damlType, "RelTime") || strings.Contains(damlType, "RELTIME"):
+		return "RELTIME"
+	case strings.Contains(damlType, "Set") && !strings.Contains(damlType, "Settle") && !strings.Contains(damlType, "Setup"):
+		return "SET"
 	case damlType == "enum":
 		return "string"
 	// Handle numeric builtin IDs from DAML LF 2.1

@@ -397,6 +397,19 @@ func mapToValue(data interface{}) *v2.Value {
 		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
 	case *big.Int:
 		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric(v, 10).FloatString(10)}}
+	case types.RELTIME:
+		microseconds := int64(time.Duration(v) / time.Microsecond)
+		return &v2.Value{Sum: &v2.Value_Int64{Int64: microseconds}}
+	case types.SET:
+		elements := make([]*v2.Value, len(v))
+		for i, elem := range v {
+			elements[i] = mapToValue(elem)
+		}
+		return &v2.Value{
+			Sum: &v2.Value_List{
+				List: &v2.List{Elements: elements},
+			},
+		}
 	case []types.INT64, []types.TEXT, []types.BOOL, []int64, []string:
 		rv := reflect.ValueOf(v)
 		elements := make([]*v2.Value, rv.Len())

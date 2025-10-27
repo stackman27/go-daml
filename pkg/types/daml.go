@@ -20,6 +20,8 @@ type (
 	OPTIONAL    *interface{}
 	GENMAP      map[string]interface{}
 	CONTRACT_ID string
+	RELTIME     time.Duration
+	SET         []interface{}
 )
 
 // VARIANT represents a DAML variant/union type
