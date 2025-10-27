@@ -82,7 +82,7 @@ func removePackageID(filename string) string {
 	return filename
 }
 
-func processDalf(dalfRelPath, unzippedPath, pkgName, sdkVersion, outputDir string, isMainDalf bool) error {
+func processDalf(dalfRelPath, unzippedPath, pkgName, sdkVersion, outputDir string, isMainDalf bool, allInterfaces map[string]*model.TmplStruct) error {
 	dalfFullPath := filepath.Join(unzippedPath, dalfRelPath)
 	dalfContent, err := os.ReadFile(dalfFullPath)
 	if err != nil {
@@ -94,7 +94,7 @@ func processDalf(dalfRelPath, unzippedPath, pkgName, sdkVersion, outputDir strin
 		MainDalf:   dalfRelPath,
 	}
 
-	pkg, err := codegen.GetAST(dalfContent, manifest)
+	pkg, err := codegen.GetASTWithInterfaces(dalfContent, manifest, allInterfaces)
 	if err != nil {
 		return fmt.Errorf("failed to generate AST: %w", err)
 	}
@@ -148,8 +148,73 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 		return fmt.Errorf("failed to create output directory '%s': %w", outputDir, err)
 	}
 
+	// First pass: collect all interfaces from all DALFs
+	log.Info().Msg("first pass: collecting interfaces from all DALFs")
+	allInterfaces := make(map[string]*model.TmplStruct)
+
+	// Collect interfaces from MainDalf
+	dalfFullPath := filepath.Join(unzippedPath, manifest.MainDalf)
+	dalfContent, err := os.ReadFile(dalfFullPath)
+	if err != nil {
+		return fmt.Errorf("failed to read MainDalf '%s': %w", dalfFullPath, err)
+	}
+
+	dalfManifest := &model.Manifest{
+		SdkVersion: manifest.SdkVersion,
+		MainDalf:   manifest.MainDalf,
+	}
+
+	interfaces, err := codegen.GetInterfaces(dalfContent, dalfManifest)
+	if err != nil {
+		log.Warn().Err(err).Msgf("failed to extract interfaces from MainDalf: %s", manifest.MainDalf)
+	} else {
+		for key, val := range interfaces {
+			allInterfaces[key] = val
+		}
+		log.Info().Msgf("collected %d interfaces from MainDalf", len(interfaces))
+	}
+
+	// Collect interfaces from dependency DALFs
+	for _, dalf := range manifest.Dalfs {
+		if dalf == manifest.MainDalf {
+			continue
+		}
+
+		dalfLower := strings.ToLower(dalf)
+		if strings.Contains(dalfLower, "prim") || strings.Contains(dalfLower, "stdlib") {
+			continue
+		}
+
+		dalfFullPath := filepath.Join(unzippedPath, dalf)
+		dalfContent, err := os.ReadFile(dalfFullPath)
+		if err != nil {
+			log.Warn().Err(err).Msgf("failed to read dalf '%s': %s", dalf, err)
+			continue
+		}
+
+		dalfManifest := &model.Manifest{
+			SdkVersion: manifest.SdkVersion,
+			MainDalf:   dalf,
+		}
+
+		interfaces, err := codegen.GetInterfaces(dalfContent, dalfManifest)
+		if err != nil {
+			log.Warn().Err(err).Msgf("failed to extract interfaces from dalf: %s", dalf)
+			continue
+		}
+
+		for key, val := range interfaces {
+			allInterfaces[key] = val
+		}
+		log.Info().Msgf("collected %d interfaces from %s", len(interfaces), dalf)
+	}
+
+	log.Info().Msgf("total interfaces collected: %d", len(allInterfaces))
+
+	// Second pass: process all DALFs with access to all interfaces
+	log.Info().Msg("second pass: generating code for all DALFs")
 	log.Info().Msgf("processing MainDalf: %s", manifest.MainDalf)
-	err = processDalf(manifest.MainDalf, unzippedPath, pkgFile, manifest.SdkVersion, outputDir, true)
+	err = processDalf(manifest.MainDalf, unzippedPath, pkgFile, manifest.SdkVersion, outputDir, true, allInterfaces)
 	if err != nil {
 		return fmt.Errorf("failed to process MainDalf: %w", err)
 	}
@@ -173,7 +238,7 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 		}
 
 		log.Info().Msgf("processing dependency dalf: %s", dalf)
-		err = processDalf(dalf, unzippedPath, pkgFile, manifest.SdkVersion, outputDir, false)
+		err = processDalf(dalf, unzippedPath, pkgFile, manifest.SdkVersion, outputDir, false, allInterfaces)
 		if err != nil {
 			log.Error().Err(err).Msgf("failed to process dalf: %s", dalf)
 			failedCount++

@@ -48,7 +48,51 @@ func (c *codeGenAst) isEnumType(typeName string, pkg *daml.Package) bool {
 	return false
 }
 
+func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
+	interfaceMap := make(map[string]*model.TmplStruct)
+
+	var archive daml.Archive
+	err := proto.Unmarshal(c.payload, &archive)
+	if err != nil {
+		return nil, err
+	}
+
+	var payloadMapped daml.ArchivePayload
+	err = proto.Unmarshal(archive.Payload, &payloadMapped)
+	if err != nil {
+		return nil, err
+	}
+
+	damlLf := payloadMapped.GetDamlLf_2()
+	if damlLf == nil {
+		return nil, errors.New("unsupported daml version")
+	}
+
+	for _, module := range damlLf.Modules {
+		if len(damlLf.InternedStrings) == 0 {
+			continue
+		}
+
+		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
+		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
+
+		interfaces, err := c.getInterfaces(damlLf, module, moduleName)
+		if err != nil {
+			return nil, err
+		}
+		for key, val := range interfaces {
+			interfaceMap[key] = val
+		}
+	}
+
+	return interfaceMap, nil
+}
+
 func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) {
+	return c.GetTemplateStructsWithInterfaces(nil)
+}
+
+func (c *codeGenAst) GetTemplateStructsWithInterfaces(externalInterfaces map[string]*model.TmplStruct) (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct)
 
 	var archive daml.Archive
@@ -68,7 +112,7 @@ func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) 
 		return nil, errors.New("unsupported daml version")
 	}
 
-	// First pass: collect all interfaces
+	// First pass: collect all interfaces from this DALF
 	interfaceMap := make(map[string]*model.TmplStruct)
 	for _, module := range damlLf.Modules {
 		if len(damlLf.InternedStrings) == 0 {
@@ -85,6 +129,16 @@ func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) 
 		for key, val := range interfaces {
 			interfaceMap[key] = val
 			structs[key] = val
+		}
+	}
+
+	// Merge external interfaces (from other DALFs) into our interface map
+	if externalInterfaces != nil {
+		for key, val := range externalInterfaces {
+			if _, exists := interfaceMap[key]; !exists {
+				interfaceMap[key] = val
+				log.Debug().Msgf("added external interface %s to interface map", key)
+			}
 		}
 	}
 
@@ -213,6 +267,7 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 					log.Debug().Msgf("template %s implements interface: %s", templateName, interfaceName)
 
 					if interfaceStruct, exists := interfaces[interfaceName]; exists {
+						log.Debug().Msgf("found interface %s in map with %d choices", interfaceName, len(interfaceStruct.Choices))
 						for _, ifaceChoice := range interfaceStruct.Choices {
 							found := false
 							for _, tmplChoice := range tmplStruct.Choices {
@@ -222,6 +277,7 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 								}
 							}
 							if !found {
+								log.Debug().Msgf("adding interface choice %s to template %s", ifaceChoice.Name, templateName)
 								tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
 									Name:          ifaceChoice.Name,
 									ArgType:       ifaceChoice.ArgType,
@@ -230,6 +286,8 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 								})
 							}
 						}
+					} else {
+						log.Warn().Msgf("interface %s not found in interfaceMap for template %s - this interface is likely from a dependency DALF", interfaceName, templateName)
 					}
 				}
 			}

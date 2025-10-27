@@ -153,7 +153,29 @@ func GetManifest(srcPath string) (*model.Manifest, error) {
 	return manifest, nil
 }
 
+func GetInterfaces(payload []byte, manifest *model.Manifest) (map[string]*model.TmplStruct, error) {
+	var version string
+	if strings.HasPrefix(manifest.SdkVersion, astgen.V3) {
+		version = astgen.V3
+	} else if strings.HasPrefix(manifest.SdkVersion, astgen.V2) || strings.HasPrefix(manifest.SdkVersion, astgen.V1) {
+		version = astgen.V2
+	} else {
+		return nil, fmt.Errorf("unsupported sdk version %s", manifest.SdkVersion)
+	}
+
+	gen, err := astgen.GetAstGenFromVersion(payload, version)
+	if err != nil {
+		return nil, err
+	}
+
+	return gen.GetInterfaces()
+}
+
 func GetAST(payload []byte, manifest *model.Manifest) (*model.Package, error) {
+	return GetASTWithInterfaces(payload, manifest, nil)
+}
+
+func GetASTWithInterfaces(payload []byte, manifest *model.Manifest, externalInterfaces map[string]*model.TmplStruct) (*model.Package, error) {
 	var version string
 	if strings.HasPrefix(manifest.SdkVersion, astgen.V3) {
 		version = astgen.V3
@@ -168,7 +190,7 @@ func GetAST(payload []byte, manifest *model.Manifest) (*model.Package, error) {
 		return nil, err
 	}
 	var structs map[string]*model.TmplStruct
-	structs, err = gen.GetTemplateStructs()
+	structs, err = gen.GetTemplateStructsWithInterfaces(externalInterfaces)
 	if err != nil {
 		return nil, err
 	}
