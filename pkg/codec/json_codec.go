@@ -95,6 +95,8 @@ func (codec *JsonCodec) toDynamicValue(value interface{}) (interface{}, error) {
 		return codec.reltimeToDynamicValue(v), nil
 	case types.SET:
 		return codec.setToDynamicValue(v)
+	case types.TUPLE2:
+		return codec.tuple2ToDynamicValue(v)
 	case types.GENMAP:
 		return codec.genMapToDynamicValue(v)
 	case types.MAP:
@@ -227,6 +229,21 @@ func (codec *JsonCodec) setToDynamicValue(s types.SET) (interface{}, error) {
 		result[i] = converted
 	}
 	return result, nil
+}
+
+func (codec *JsonCodec) tuple2ToDynamicValue(t types.TUPLE2) (interface{}, error) {
+	first, err := codec.toDynamicValue(t.First)
+	if err != nil {
+		return nil, err
+	}
+	second, err := codec.toDynamicValue(t.Second)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"_1": first,
+		"_2": second,
+	}, nil
 }
 
 func (codec *JsonCodec) genMapToDynamicValue(gm types.GENMAP) (interface{}, error) {
@@ -474,6 +491,9 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 
 	case reflect.TypeOf(types.SET{}):
 		return codec.assignSetValue(jsonValue, target)
+
+	case reflect.TypeOf(types.TUPLE2{}):
+		return codec.assignTuple2Value(jsonValue, target)
 
 	case reflect.TypeOf(types.GENMAP{}):
 		return codec.assignGenMapValue(jsonValue, target)
@@ -737,6 +757,23 @@ func (codec *JsonCodec) assignSetValue(jsonValue interface{}, target reflect.Val
 		return nil
 	}
 	return fmt.Errorf("expected array for SET, got %T", jsonValue)
+}
+
+func (codec *JsonCodec) assignTuple2Value(jsonValue interface{}, target reflect.Value) error {
+	if m, ok := jsonValue.(map[string]interface{}); ok {
+		first, hasFirst := m["_1"]
+		second, hasSecond := m["_2"]
+		if !hasFirst || !hasSecond {
+			return fmt.Errorf("TUPLE2 missing _1 or _2 fields")
+		}
+		result := types.TUPLE2{
+			First:  first,
+			Second: second,
+		}
+		target.Set(reflect.ValueOf(result))
+		return nil
+	}
+	return fmt.Errorf("expected object for TUPLE2, got %T", jsonValue)
 }
 
 func (codec *JsonCodec) assignSliceValue(jsonValue interface{}, target reflect.Value) error {

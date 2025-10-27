@@ -82,6 +82,21 @@ func removePackageID(filename string) string {
 	return filename
 }
 
+func getFilenameFromDalf(dalfRelPath string) string {
+	parts := strings.Split(dalfRelPath, "/")
+	var baseFileName string
+	if len(parts) > 1 {
+		dalfFileName := parts[len(parts)-1]
+		baseFileName = strings.TrimSuffix(dalfFileName, ".dalf")
+	} else {
+		baseFileName = strings.TrimSuffix(dalfRelPath, ".dalf")
+	}
+
+	baseFileName = removePackageID(baseFileName)
+	sanitizedFileName := strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(baseFileName), ".", "_"), "-", "_")
+	return sanitizedFileName
+}
+
 func processDalf(dalfRelPath, unzippedPath, pkgName, sdkVersion, outputDir string, isMainDalf bool, allInterfaces map[string]*model.TmplStruct) error {
 	dalfFullPath := filepath.Join(unzippedPath, dalfRelPath)
 	dalfContent, err := os.ReadFile(dalfFullPath)
@@ -99,31 +114,19 @@ func processDalf(dalfRelPath, unzippedPath, pkgName, sdkVersion, outputDir strin
 		return fmt.Errorf("failed to generate AST: %w", err)
 	}
 
-	res, err := codegen.Bind(pkgName, pkg.PackageID, sdkVersion, pkg.Structs, isMainDalf)
+	code, err := codegen.Bind(pkgName, pkg.PackageID, sdkVersion, pkg.Structs, isMainDalf)
 	if err != nil {
 		return fmt.Errorf("failed to generate Go code: %w", err)
 	}
 
-	parts := strings.Split(dalfRelPath, "/")
-	var baseFileName string
-	if len(parts) > 1 {
-		dalfFileName := parts[len(parts)-1]
-		baseFileName = strings.TrimSuffix(dalfFileName, ".dalf")
-	} else {
-		baseFileName = strings.TrimSuffix(dalfRelPath, ".dalf")
+	baseFileName := getFilenameFromDalf(dalfRelPath)
+	outputFile := filepath.Join(outputDir, baseFileName+".go")
+
+	if err := os.WriteFile(outputFile, []byte(code), 0o644); err != nil {
+		return fmt.Errorf("failed to write file '%s': %w", outputFile, err)
 	}
 
-	baseFileName = removePackageID(baseFileName)
-
-	sanitizedFileName := strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(baseFileName), ".", "_"), "-", "_")
-	fileName := filepath.Join(outputDir, sanitizedFileName+".go")
-
-	err = os.WriteFile(fileName, []byte(res), 0o644)
-	if err != nil {
-		return fmt.Errorf("failed to save generated file '%s': %w", fileName, err)
-	}
-
-	log.Info().Msgf("successfully generated Go code: %s", fileName)
+	log.Info().Msgf("successfully generated: %s", outputFile)
 	return nil
 }
 

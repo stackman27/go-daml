@@ -97,6 +97,8 @@ func NormalizeDAMLType(damlType string) string {
 		return "RELTIME"
 	case strings.Contains(damlType, "Set") && !strings.Contains(damlType, "Settle") && !strings.Contains(damlType, "Setup"):
 		return "SET"
+	case strings.Contains(damlType, "Tuple2") || strings.Contains(damlType, "TUPLE2"):
+		return "TUPLE2"
 	case damlType == "enum":
 		return "string"
 	// Handle numeric builtin IDs from DAML LF 2.1

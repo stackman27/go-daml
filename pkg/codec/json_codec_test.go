@@ -698,3 +698,98 @@ func TestJsonCodec_RoundTrip_RELTIME_SET(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, originalSet, resultSet)
 }
+
+func TestJsonCodec_Marshall_TUPLE2(t *testing.T) {
+	codec := NewJsonCodec()
+
+	tests := []struct {
+		name     string
+		input    TUPLE2
+		expected string
+	}{
+		{
+			name: "TUPLE2 of strings",
+			input: TUPLE2{
+				First:  "hello",
+				Second: "world",
+			},
+			expected: `{"_1":"hello","_2":"world"}`,
+		},
+		{
+			name: "TUPLE2 of mixed types",
+			input: TUPLE2{
+				First:  INT64(42),
+				Second: TEXT("test"),
+			},
+			expected: `{"_1":"42","_2":"test"}`,
+		},
+		{
+			name: "TUPLE2 of numbers",
+			input: TUPLE2{
+				First:  1,
+				Second: 2,
+			},
+			expected: `{"_1":"1","_2":"2"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := codec.Marshall(tt.input)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.expected, string(result))
+		})
+	}
+}
+
+func TestJsonCodec_Unmarshall_TUPLE2(t *testing.T) {
+	codec := NewJsonCodec()
+
+	tests := []struct {
+		name     string
+		json     string
+		expected TUPLE2
+	}{
+		{
+			name: "TUPLE2 from object",
+			json: `{"_1":"hello","_2":"world"}`,
+			expected: TUPLE2{
+				First:  "hello",
+				Second: "world",
+			},
+		},
+		{
+			name: "TUPLE2 with numbers",
+			json: `{"_1":42,"_2":100}`,
+			expected: TUPLE2{
+				First:  float64(42),
+				Second: float64(100),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result TUPLE2
+			err := codec.Unmarshall([]byte(tt.json), &result)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestJsonCodec_RoundTrip_TUPLE2(t *testing.T) {
+	codec := NewJsonCodec()
+
+	original := TUPLE2{
+		First:  "first value",
+		Second: "second value",
+	}
+	jsonBytes, err := codec.Marshall(original)
+	require.NoError(t, err)
+
+	var result TUPLE2
+	err = codec.Unmarshall(jsonBytes, &result)
+	require.NoError(t, err)
+	assert.Equal(t, original, result)
+}

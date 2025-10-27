@@ -410,6 +410,22 @@ func mapToValue(data interface{}) *v2.Value {
 				List: &v2.List{Elements: elements},
 			},
 		}
+	case types.TUPLE2:
+		fields := []*v2.RecordField{
+			{
+				Label: "_1",
+				Value: mapToValue(v.First),
+			},
+			{
+				Label: "_2",
+				Value: mapToValue(v.Second),
+			},
+		}
+		return &v2.Value{
+			Sum: &v2.Value_Record{
+				Record: &v2.Record{Fields: fields},
+			},
+		}
 	case []types.INT64, []types.TEXT, []types.BOOL, []int64, []string:
 		rv := reflect.ValueOf(v)
 		elements := make([]*v2.Value, rv.Len())

@@ -131,3 +131,4 @@ func isAllCaps(input string) bool {
 	}
 	return false
 }
+

@@ -22,6 +22,10 @@ type (
 	CONTRACT_ID string
 	RELTIME     time.Duration
 	SET         []interface{}
+	TUPLE2      struct {
+		First  interface{}
+		Second interface{}
+	}
 )
 
 // VARIANT represents a DAML variant/union type
