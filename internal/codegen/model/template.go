@@ -8,17 +8,18 @@ import (
 )
 
 type TmplStruct struct {
-	Name        string
-	ModuleName  string
-	Fields      []*TmplField
-	RawType     string
-	IsTemplate  bool
-	IsInterface bool
-	Key         *TmplField
-	Choices     []*TmplChoice
-	Implements  []string
-	Signatories []string
-	Observers   []string
+	Name         string
+	DAMLName     string
+	ModuleName   string
+	Fields       []*TmplField
+	RawType      string
+	IsTemplate   bool
+	IsInterface  bool
+	Key          *TmplField
+	Choices      []*TmplChoice
+	Implements   []string
+	Signatories  []string
+	Observers    []string
 }
 
 type TmplField struct {
@@ -30,10 +31,11 @@ type TmplField struct {
 }
 
 type TmplChoice struct {
-	Name          string
-	ArgType       string
-	ReturnType    string
-	InterfaceName string // The name of the interface this choice comes from (empty for template choices)
+	Name              string
+	ArgType           string
+	ReturnType        string
+	InterfaceName     string // The Go name of the interface this choice comes from (e.g., "ITransferable")
+	InterfaceDAMLName string // The original DAML name of the interface (e.g., "Transferable")
 }
 
 type Package struct {

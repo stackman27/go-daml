@@ -1663,18 +1663,18 @@ func TestConvertToRecordTUPLE2(t *testing.T) {
 func TestConvertToRecordRELTIMEAndSETAndTUPLE2Integration(t *testing.T) {
 	t.Run("RELTIME, SET, and TUPLE2 in same struct", func(t *testing.T) {
 		type TestFullIntegrationStruct struct {
-			Owner            types.PARTY   `json:"owner"`
-			TickDuration     types.RELTIME `json:"tickDuration"`
-			RequiredParties  types.SET     `json:"requiredParties"`
-			Name             types.TEXT    `json:"name"`
-			Coordinate       types.TUPLE2  `json:"coordinate"`
+			Owner             types.PARTY   `json:"owner"`
+			TickDuration      types.RELTIME `json:"tickDuration"`
+			RequiredParties   types.SET     `json:"requiredParties"`
+			Name              types.TEXT    `json:"name"`
+			Coordinate        types.TUPLE2  `json:"coordinate"`
 			MaxProcessingTime types.RELTIME `json:"maxProcessingTime"`
-			Metadata         types.TUPLE2  `json:"metadata"`
+			Metadata          types.TUPLE2  `json:"metadata"`
 		}
 
 		testData := TestFullIntegrationStruct{
-			Owner:        types.PARTY("alice"),
-			TickDuration: types.RELTIME(10 * time.Second),
+			Owner:           types.PARTY("alice"),
+			TickDuration:    types.RELTIME(10 * time.Second),
 			RequiredParties: types.SET{"alice", "bob", "charlie"},
 			Name:            types.TEXT("full integration test"),
 			Coordinate: types.TUPLE2{

@@ -123,7 +123,7 @@ func (t Asset) AssetTransfer(contractID string, args AssetTransfer) *model.Exerc
 // Transfer exercises the Transfer choice on this Asset contract via the ITransferable interface
 func (t Asset) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "ITransferable"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Transferable"),
 		ContractID: contractID,
 		Choice:     "Transfer",
 		Arguments:  argsToMap(args),
@@ -216,7 +216,7 @@ func (t Token) Archive(contractID string) *model.ExerciseCommand {
 // Transfer exercises the Transfer choice on this Token contract via the ITransferable interface
 func (t Token) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "ITransferable"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Transferable"),
 		ContractID: contractID,
 		Choice:     "Transfer",
 		Arguments:  argsToMap(args),
@@ -283,5 +283,5 @@ func ITransferableInterfaceID(packageID *string) string {
 	if packageID != nil {
 		pkgID = *packageID
 	}
-	return fmt.Sprintf("%s:%s:%s", pkgID, "Interfaces", "ITransferable")
+	return fmt.Sprintf("%s:%s:%s", pkgID, "Interfaces", "Transferable")
 }

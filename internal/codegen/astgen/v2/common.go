@@ -232,11 +232,13 @@ func (c *codeGenAst) getInterfaces(pkg *daml.Package, module *daml.Module, modul
 	structs := make(map[string]*model.TmplStruct, 0)
 
 	for _, iface := range module.Interfaces {
-		interfaceName := "I" + c.getName(pkg, iface.TyconInternedDname)
+		originalName := c.getName(pkg, iface.TyconInternedDname)
+		interfaceName := "I" + originalName
 		log.Debug().Msgf("processing interface: %s", interfaceName)
 
 		tmplStruct := model.TmplStruct{
 			Name:        interfaceName,
+			DAMLName:    originalName,
 			ModuleName:  moduleName,
 			RawType:     RawTypeInterface,
 			IsInterface: true,

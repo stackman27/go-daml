@@ -279,10 +279,11 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 							if !found {
 								log.Debug().Msgf("adding interface choice %s to template %s", ifaceChoice.Name, templateName)
 								tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
-									Name:          ifaceChoice.Name,
-									ArgType:       ifaceChoice.ArgType,
-									ReturnType:    ifaceChoice.ReturnType,
-									InterfaceName: interfaceName,
+									Name:              ifaceChoice.Name,
+									ArgType:           ifaceChoice.ArgType,
+									ReturnType:        ifaceChoice.ReturnType,
+									InterfaceName:     interfaceName,
+									InterfaceDAMLName: interfaceStruct.DAMLName,
 								})
 							}
 						}
@@ -330,11 +331,13 @@ func (c *codeGenAst) getInterfaces(pkg *daml.Package, module *daml.Module, modul
 	structs := make(map[string]*model.TmplStruct, 0)
 
 	for _, iface := range module.Interfaces {
-		interfaceName := "I" + c.getName(pkg, iface.TyconInternedDname)
+		originalName := c.getName(pkg, iface.TyconInternedDname)
+		interfaceName := "I" + originalName
 		log.Info().Msgf("processing interface: %s", interfaceName)
 
 		tmplStruct := model.TmplStruct{
 			Name:        interfaceName,
+			DAMLName:    originalName,
 			ModuleName:  moduleName,
 			RawType:     RawTypeInterface,
 			IsInterface: true,
