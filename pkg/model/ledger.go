@@ -295,18 +295,19 @@ type Filters struct {
 }
 
 type InclusiveFilters struct {
-	TemplateFilters []*TemplateFilter
+	TemplateFilters  []*TemplateFilter
+	InterfaceFilters []*InterfaceFilter
 }
 
 type TemplateFilter struct {
 	TemplateID              string
-	InterfaceFilter         *InterfaceFilter
 	IncludeCreatedEventBlob bool
 }
 
 type InterfaceFilter struct {
-	InterfaceID          string
-	IncludeInterfaceView bool
+	InterfaceID             string
+	IncludeInterfaceView    bool
+	IncludeCreatedEventBlob bool
 }
 
 type GetConnectedSynchronizersRequest struct{}
