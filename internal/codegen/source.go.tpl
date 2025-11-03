@@ -18,8 +18,9 @@ var (
 )
 
 {{if .IsMainDalf}}
-const PackageID = "{{.PackageID}}"
 const SDKVersion = "{{.SdkVersion}}"
+
+const packageName = "{{.PackageName}}"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -125,7 +126,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 	// GetEnumTypeID implements types.ENUM interface
 	func (e {{capitalise .Name}}) GetEnumTypeID() string {
-		return fmt.Sprintf("%s:%s:%s", PackageID, "{{.ModuleName}}", "{{capitalise .Name}}")
+		return fmt.Sprintf("#%s:%s:%s", packageName, "{{.ModuleName}}", "{{capitalise .Name}}")
 	}
 
 	// MarshalJSON implements custom JSON marshaling for {{capitalise .Name}} using JsonCodec
@@ -174,7 +175,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 	// GetTemplateID returns the template ID for this template
 	func (t {{capitalise .Name}}) GetTemplateID() string {
-		return fmt.Sprintf("%s:%s:%s", PackageID, "{{.ModuleName}}", "{{capitalise .Name}}")
+		return fmt.Sprintf("#%s:%s:%s", packageName, "{{.ModuleName}}", "{{capitalise .Name}}")
 	}
 
 	// CreateCommand returns a CreateCommand for this template
@@ -239,7 +240,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract{{if ne $choice.InterfaceName ""}} via the {{capitalise $choice.InterfaceName}} interface{{end}}
 	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
 		return &model.ExerciseCommand{
-			{{if ne $choice.InterfaceName ""}}TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $choice.InterfaceDAMLName}}"),{{else}}TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),{{end}}
+			{{if ne $choice.InterfaceName ""}}TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "{{$moduleName}}", "{{capitalise $choice.InterfaceDAMLName}}"),{{else}}TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "{{$moduleName}}", "{{capitalise $templateName}}"),{{end}}
 			ContractID: contractID,
 			Choice: "{{$choice.Name}}",
 			{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
@@ -267,11 +268,11 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 // {{capitalise $interfaceName}}InterfaceID returns the interface ID for the {{capitalise $interfaceName}} interface
 func {{capitalise $interfaceName}}InterfaceID(packageID *string) string {
-	pkgID := PackageID
+	pkgName := packageName
 	if packageID != nil {
-		pkgID = *packageID
+		pkgName = *packageID
 	}
-	return fmt.Sprintf("%s:%s:%s", pkgID, "{{$moduleName}}", "{{capitalise $damlName}}")
+	return fmt.Sprintf("#%s:%s:%s", pkgName, "{{$moduleName}}", "{{capitalise $damlName}}")
 }
 {{end}}
 {{end}}

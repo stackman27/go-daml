@@ -200,7 +200,13 @@ func GetASTWithInterfaces(payload []byte, manifest *model.Manifest, externalInte
 		return nil, fmt.Errorf("could not extract package ID from MainDalf: %s", manifest.MainDalf)
 	}
 
+	packageName := manifest.Name
+	if packageName == "" {
+		packageName = packageID
+	}
+
 	return &model.Package{
+		Name:      packageName,
 		PackageID: packageID,
 		Structs:   structs,
 	}, nil

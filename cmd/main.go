@@ -114,7 +114,7 @@ func processDalf(dalfRelPath, unzippedPath, pkgName, sdkVersion, outputDir strin
 		return fmt.Errorf("failed to generate AST: %w", err)
 	}
 
-	code, err := codegen.Bind(pkgName, pkg.PackageID, sdkVersion, pkg.Structs, isMainDalf)
+	code, err := codegen.Bind(pkgName, pkg.PackageID, pkg.Name, sdkVersion, pkg.Structs, isMainDalf)
 	if err != nil {
 		return fmt.Errorf("failed to generate Go code: %w", err)
 	}
@@ -345,7 +345,7 @@ func processDalfWithConflictCheck(dalfRelPath, unzippedPath, pkgName, sdkVersion
 		}
 	}
 
-	code, err := codegen.Bind(pkgName, pkg.PackageID, sdkVersion, pkg.Structs, isMainDalf)
+	code, err := codegen.Bind(pkgName, pkg.PackageID, pkg.Name, sdkVersion, pkg.Structs, isMainDalf)
 	if err != nil {
 		return fmt.Errorf("failed to generate Go code: %w", err)
 	}

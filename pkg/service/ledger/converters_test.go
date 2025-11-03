@@ -712,7 +712,7 @@ func TestConvertToRecordIntegration(t *testing.T) {
 		args["someUglyNesting"] = t.SomeUglyNesting
 		args["someText"] = t.SomeText
 		return &model.CreateCommand{
-			TemplateID: "test:template:OneOfEverything",
+			TemplateID: "#test:template:OneOfEverything",
 			Arguments:  args,
 		}
 	}
