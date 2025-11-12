@@ -337,7 +337,7 @@ func GetAST(payload []byte, manifest *model.Manifest, ifcByModule map[string]mod
 
 	packageName := manifest.Name
 	if packageName == "" {
-		packageName = packageID
+		packageName = getPackageName(manifest.MainDalf)
 	}
 
 	return &model.Package{
@@ -357,4 +357,30 @@ func getPackageID(mainDalf string) string {
 	}
 
 	return ""
+}
+
+func getPackageName(mainDalf string) string {
+	parts := strings.Split(mainDalf, "/")
+	filename := strings.TrimSuffix(parts[len(parts)-1], ".dalf")
+
+	lastHyphen := strings.LastIndex(filename, "-")
+	if lastHyphen == -1 {
+		return strings.ToLower(filename)
+	}
+
+	potentialHash := filename[lastHyphen+1:]
+	if len(potentialHash) == 64 {
+		allHex := true
+		for _, ch := range potentialHash {
+			if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+				allHex = false
+				break
+			}
+		}
+		if allHex {
+			return strings.ToLower(filename[:lastHyphen])
+		}
+	}
+
+	return strings.ToLower(filename)
 }

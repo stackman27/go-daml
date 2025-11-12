@@ -290,3 +290,12 @@ func TestGetMainDalfV3(t *testing.T) {
 
 	require.Equal(t, string(expectedCode), res, "generated code should match expected output")
 }
+
+func TestGetPackageName(t *testing.T) {
+	require.Equal(t, "all-kinds-of-1.0.0",
+		getPackageName("all-kinds-of-1.0.0-6d7e83e81a0a7960eec37340f5b11e7a61606bd9161f413684bc345c3f387948/all-kinds-of-1.0.0-6d7e83e81a0a7960eec37340f5b11e7a61606bd9161f413684bc345c3f387948.dalf"))
+	require.Equal(t, "my-package-1.0.0",
+		getPackageName("my-package-1.0.0-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef.dalf"))
+	require.Equal(t, "my-package-1.0.0",
+		getPackageName("My-Package-1.0.0-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef.dalf"))
+}
