@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/noders-team/go-daml/examples/codegen"
 	interfaces "github.com/noders-team/go-daml/examples/codegen/interfaces"
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/errors"
@@ -22,8 +21,6 @@ import (
 )
 
 const (
-	grpcAddress      = "localhost:3901"
-	bearerToken      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJodHRwczovL2NhbnRvbi5uZXR3b3JrLmdsb2JhbCIsInN1YiI6ImxlZGdlci1hcGktdXNlciJ9.A0VZW69lWWNVsjZmDDpVvr1iQ_dJLga3f-K2bicdtsc"
 	darFilePath      = "../../test-data/all-kinds-of-1.0.0.dar"
 	interfaceDarPath = "../../test-data/amulets-interface-test-1.0.0.dar"
 	user             = "app-provider"
@@ -33,26 +30,10 @@ func TestCodegenIntegration(t *testing.T) {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	log.Info().Str("generatedPackageID", PackageID).Msg("Using package ID from generated code")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	builder := client.NewDamlClient(bearerToken, grpcAddress)
-	if strings.HasSuffix(grpcAddress, ":443") {
-		tlsConfig := client.TlsConfig{}
-		builder = builder.WithTLSConfig(tlsConfig)
-	}
-
-	cl, err := builder.
-		Build(context.Background())
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to build DAML client")
-	}
-
-	if err = cl.Ping(ctx); err != nil {
-		log.Fatal().Err(err).Msg("failed to ping DAML client")
-	}
-
+	var err error
 	if err = cl.ValidateSDKVersion(ctx, SDKVersion); err != nil {
 		log.Warn().Err(err).Msg("failed to validate SDK version, ignoring")
 	}
@@ -138,6 +119,7 @@ func TestCodegenIntegration(t *testing.T) {
 	submissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
+			UserID:       user,
 			CommandID:    commandID,
 			ActAs:        []string{party},
 			SubmissionID: "sub-" + time.Now().Format("20060102150405"),
@@ -154,12 +136,17 @@ func TestCodegenIntegration(t *testing.T) {
 	}
 	log.Info().Msgf("response.UpdateID: %s", response.UpdateID)
 
-	respUpd, err := cl.UpdateService.GetTransactionByID(ctx, &model.GetTransactionByIDRequest{
-		UpdateID:          response.UpdateID,
-		RequestingParties: []string{party},
+	respUpd, err := cl.UpdateService.GetUpdateById(ctx, &model.GetUpdateByIDRequest{
+		UpdateID: response.UpdateID,
+		UpdateFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {},
+			},
+			Verbose: true,
+		},
 	})
 	if err != nil {
-		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to GetTransactionByID")
+		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to GetUpdateById")
 	}
 	require.NotNil(t, respUpd.Transaction, "expected transaction")
 	if respUpd.Transaction != nil {
@@ -178,11 +165,16 @@ func TestCodegenIntegration(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, createUpdateID, "should have a valid create updateID")
 
-	txResp, err := cl.UpdateService.GetTransactionByID(ctx, &model.GetTransactionByIDRequest{
-		UpdateID:          createUpdateID,
-		RequestingParties: []string{party},
+	txResp, err := cl.UpdateService.GetUpdateById(ctx, &model.GetUpdateByIDRequest{
+		UpdateID: createUpdateID,
+		UpdateFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {},
+			},
+			Verbose: true,
+		},
 	})
-	require.NoError(t, err, "GetTransactionByID should succeed")
+	require.NoError(t, err, "GetUpdateById should succeed")
 	require.NotNil(t, txResp, "response should not be nil")
 	require.NotNil(t, txResp.Transaction, "transaction should not be nil")
 
@@ -216,20 +208,9 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	builder := client.NewDamlClient(bearerToken, grpcAddress)
-	if strings.HasSuffix(grpcAddress, ":443") {
-		tlsConfig := client.TlsConfig{}
-		builder = builder.WithTLSConfig(tlsConfig)
-	}
-
-	cl, err := builder.
-		Build(context.Background())
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to build DAML client")
-	}
-
-	if err = cl.Ping(ctx); err != nil {
-		log.Fatal().Err(err).Msg("failed to ping DAML client")
+	var err error
+	if err = cl.ValidateSDKVersion(ctx, SDKVersion); err != nil {
+		log.Warn().Err(err).Msg("failed to validate SDK version, ignoring")
 	}
 
 	uploadedPackageName := "all-kinds-of"
@@ -258,11 +239,18 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	}
 
 	// subscribing to updates
-	updRes, errRes := cl.UpdateService.GetUpdates(context.Background(), &model.GetUpdatesRequest{Filter: &model.TransactionFilter{
-		FiltersByParty: map[string]*model.Filters{
-			party: {},
+	updRes, errRes := cl.UpdateService.GetUpdates(context.Background(), &model.GetUpdatesRequest{
+		Filter: &model.TransactionFilter{
+			FiltersByParty: map[string]*model.Filters{
+				party: {},
+			},
 		},
-	}})
+		UpdateFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {},
+			},
+		},
+	})
 	go func() {
 		for {
 			select {
@@ -371,6 +359,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	submissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
+			UserID:       user,
 			CommandID:    commandID,
 			ActAs:        []string{party},
 			SubmissionID: "sub-" + time.Now().Format("20060102150405"),
@@ -387,12 +376,17 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	}
 	log.Info().Msgf("response.UpdateID: %s", response.UpdateID)
 
-	respUpd, err := cl.UpdateService.GetTransactionByID(ctx, &model.GetTransactionByIDRequest{
-		UpdateID:          response.UpdateID,
-		RequestingParties: []string{party},
+	respUpd, err := cl.UpdateService.GetUpdateById(ctx, &model.GetUpdateByIDRequest{
+		UpdateID: response.UpdateID,
+		UpdateFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {},
+			},
+			Verbose: true,
+		},
 	})
 	if err != nil {
-		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to GetTransactionByID")
+		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to GetUpdateById")
 	}
 	require.NotNil(t, respUpd.Transaction, "expected transaction")
 	if respUpd.Transaction != nil {
@@ -411,11 +405,16 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, createUpdateID, "should have a valid create updateID")
 
-	txResp, err := cl.UpdateService.GetTransactionByID(ctx, &model.GetTransactionByIDRequest{
-		UpdateID:          createUpdateID,
-		RequestingParties: []string{party},
+	txResp, err := cl.UpdateService.GetUpdateById(ctx, &model.GetUpdateByIDRequest{
+		UpdateID: createUpdateID,
+		UpdateFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {},
+			},
+			Verbose: true,
+		},
 	})
-	require.NoError(t, err, "GetTransactionByID should succeed")
+	require.NoError(t, err, "GetUpdateById should succeed")
 	require.NotNil(t, txResp, "response should not be nil")
 	require.NotNil(t, txResp.Transaction, "transaction should not be nil")
 
@@ -459,19 +458,9 @@ func TestAmuletsTransfer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	builder := client.NewDamlClient(bearerToken, grpcAddress)
-	if strings.HasSuffix(grpcAddress, ":443") {
-		tlsConfig := client.TlsConfig{}
-		builder = builder.WithTLSConfig(tlsConfig)
-	}
-
-	cl, err := builder.Build(context.Background())
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to build DAML client")
-	}
-
-	if err = cl.Ping(ctx); err != nil {
-		log.Fatal().Err(err).Msg("failed to ping DAML client")
+	var err error
+	if err = cl.ValidateSDKVersion(ctx, SDKVersion); err != nil {
+		log.Warn().Err(err).Msg("failed to validate SDK version, ignoring")
 	}
 
 	uploadedPackageName := "amulets-interface-test"
@@ -497,6 +486,20 @@ func TestAmuletsTransfer(t *testing.T) {
 
 	updRes, errRes := cl.UpdateService.GetUpdates(context.Background(), &model.GetUpdatesRequest{
 		Filter: &model.TransactionFilter{
+			FiltersByParty: map[string]*model.Filters{
+				party: {
+					Inclusive: &model.InclusiveFilters{
+						InterfaceFilters: []*model.InterfaceFilter{
+							{
+								InterfaceID:          transferableInterfaceID,
+								IncludeInterfaceView: true,
+							},
+						},
+					},
+				},
+			},
+		},
+		UpdateFormat: &model.EventFormat{
 			FiltersByParty: map[string]*model.Filters{
 				party: {
 					Inclusive: &model.InclusiveFilters{
@@ -573,6 +576,7 @@ func TestAmuletsTransfer(t *testing.T) {
 	transferSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "transfer-workflow-" + time.Now().Format("20060102150405"),
+			UserID:       user,
 			CommandID:    "transfer-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "transfer-sub-" + time.Now().Format("20060102150405"),
@@ -597,6 +601,7 @@ func TestAmuletsTransfer(t *testing.T) {
 	archiveSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
+			UserID:       user,
 			CommandID:    "archive-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "archive-sub-" + time.Now().Format("20060102150405"),
@@ -691,6 +696,7 @@ func createContract(ctx context.Context, party string, cl *client.DamlBindingCli
 	createSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "create-contracts-" + time.Now().Format("20060102150405"),
+			UserID:       user,
 			CommandID:    "create-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "create-sub-" + time.Now().Format("20060102150405"),
@@ -722,9 +728,14 @@ func createContract(ctx context.Context, party string, cl *client.DamlBindingCli
 }
 
 func getContractIDsFromUpdate(ctx context.Context, party, updateID string, cl *client.DamlBindingClient) ([]string, error) {
-	response, err := cl.UpdateService.GetTransactionByID(ctx, &model.GetTransactionByIDRequest{
-		UpdateID:          updateID,
-		RequestingParties: []string{party},
+	response, err := cl.UpdateService.GetUpdateById(ctx, &model.GetUpdateByIDRequest{
+		UpdateID: updateID,
+		UpdateFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {},
+			},
+			Verbose: true,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get transaction by ID: %w", err)
@@ -758,6 +769,7 @@ func createContractWithUpdateID(ctx context.Context, party string, cl *client.Da
 	createSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "create-contracts-" + time.Now().Format("20060102150405"),
+			UserID:       user,
 			CommandID:    "create-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "create-sub-" + time.Now().Format("20060102150405"),
@@ -797,6 +809,7 @@ func getUpdateIDFromContractCreate(ctx context.Context, party string, cl *client
 	createSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "create-for-typed-test-" + time.Now().Format("20060102150405"),
+			UserID:       user,
 			CommandID:    "create-typed-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "create-typed-sub-" + time.Now().Format("20060102150405"),
