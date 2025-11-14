@@ -282,7 +282,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 			}
 		}
 
-		code, err := Bind(pkgFile, pkg.PackageID, dalfManifest.SdkVersion, pkg.Structs, dalf == dalfManifest.MainDalf)
+		code, err := Bind(pkgFile, pkg.Name, dalfManifest.SdkVersion, pkg.Structs, dalf == dalfManifest.MainDalf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate Go code: %w", err)
 		}
@@ -335,7 +335,13 @@ func GetAST(payload []byte, manifest *model.Manifest, ifcByModule map[string]mod
 		return nil, fmt.Errorf("could not extract package ID from MainDalf: %s", manifest.MainDalf)
 	}
 
+	packageName := manifest.Name
+	if packageName == "" {
+		packageName = getPackageName(manifest.MainDalf)
+	}
+
 	return &model.Package{
+		Name:      packageName,
 		PackageID: packageID,
 		Structs:   structs,
 	}, nil
@@ -351,4 +357,30 @@ func getPackageID(mainDalf string) string {
 	}
 
 	return ""
+}
+
+func getPackageName(mainDalf string) string {
+	parts := strings.Split(mainDalf, "/")
+	filename := strings.TrimSuffix(parts[len(parts)-1], ".dalf")
+
+	lastHyphen := strings.LastIndex(filename, "-")
+	if lastHyphen == -1 {
+		return strings.ToLower(filename)
+	}
+
+	potentialHash := filename[lastHyphen+1:]
+	if len(potentialHash) == 64 {
+		allHex := true
+		for _, ch := range potentialHash {
+			if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+				allHex = false
+				break
+			}
+		}
+		if allHex {
+			return strings.ToLower(filename[:lastHyphen])
+		}
+	}
+
+	return strings.ToLower(filename)
 }

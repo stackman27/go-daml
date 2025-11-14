@@ -24,7 +24,8 @@ import (
 var defaultJsonCodec = codec.NewJsonCodec()
 
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
-	parts := strings.Split(templateID, ":")
+	trimmed := strings.TrimPrefix(templateID, "#")
+	parts := strings.Split(trimmed, ":")
 	if len(parts) == 3 {
 		return parts[0], parts[1], parts[2]
 	} else if len(parts) == 2 {
@@ -213,6 +214,18 @@ func eventFormatToProto(format *model.EventFormat) *v2.EventFormat {
 		FiltersForAnyParty: filtersToProto(format.FiltersForAnyParty),
 		FiltersByParty:     filtersByParty,
 		Verbose:            format.Verbose,
+	}
+}
+
+func updateFormatToProto(format *model.EventFormat) *v2.UpdateFormat {
+	if format == nil {
+		return nil
+	}
+	return &v2.UpdateFormat{
+		IncludeTransactions: &v2.TransactionFormat{
+			EventFormat:      eventFormatToProto(format),
+			TransactionShape: 1,
+		},
 	}
 }
 
