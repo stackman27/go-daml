@@ -200,8 +200,10 @@ func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockert
 	}
 	log.Info().Msgf("canton admin API port %s is ready", adminAPIPort)
 
-	log.Info().Msg("port is open, waiting for Canton to fully initialize gRPC...")
-	time.Sleep(120 * time.Second)
+	log.Info().Msg("port is open, waiting for Canton to fully initialize...")
+	if err := waitForCantonReady(ctx, dockerPool, resource, 2*time.Minute); err != nil {
+		log.Fatal().Err(err).Msg("Canton sandbox initialization timeout")
+	}
 
 	return resource, grpcAddr
 }
@@ -228,6 +230,51 @@ func waitForPort(ctx context.Context, port string, timeout time.Duration) error 
 	}
 
 	return fmt.Errorf("timeout waiting for port %s", port)
+}
+
+func waitForCantonReady(ctx context.Context, pool *dockertest.Pool, resource *dockertest.Resource, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	readyMessage := "Canton sandbox is ready"
+
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		buf := &logBuffer{}
+		err := pool.Client.Logs(docker.LogsOptions{
+			Container:    resource.Container.ID,
+			OutputStream: buf,
+			Stdout:       true,
+			Stderr:       true,
+			Tail:         "100",
+		})
+		if err == nil {
+			if strings.Contains(buf.String(), readyMessage) {
+				log.Info().Msg("Canton sandbox is ready")
+				return nil
+			}
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+
+	return fmt.Errorf("sandbox timeout: Canton sandbox did not become ready within %v", timeout)
+}
+
+type logBuffer struct {
+	data []byte
+}
+
+func (b *logBuffer) Write(p []byte) (n int, err error) {
+	b.data = append(b.data, p...)
+	return len(p), nil
+}
+
+func (b *logBuffer) String() string {
+	return string(b.data)
 }
 
 func GetClient() *client.DamlBindingClient {
