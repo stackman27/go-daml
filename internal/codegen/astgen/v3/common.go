@@ -522,14 +522,18 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, builtinType *daml.Type
 			normalizedElementType := model.NormalizeDAMLType(elementType)
 			return "[]" + normalizedElementType
 		}
-		return RawTypeList // fallback to generic LIST
+		return RawTypeList
 	case daml.BuiltinType_OPTIONAL:
 		if len(builtinType.Args) > 0 {
 			elementType := c.extractType(pkg, builtinType.Args[0])
 			normalizedElementType := model.NormalizeDAMLType(elementType)
 			return "*" + normalizedElementType
 		}
-		return RawTypeOptional // fallback to generic OPTIONAL
+		return RawTypeOptional
+	case daml.BuiltinType_GENMAP:
+		return "GENMAP"
+	case daml.BuiltinType_TEXTMAP:
+		return "TEXTMAP"
 	case daml.BuiltinType_CONTRACT_ID:
 		return RawTypeContractID
 	default:

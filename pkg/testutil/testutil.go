@@ -17,10 +17,10 @@ import (
 )
 
 const (
-	damlSandboxVersion   = "3.5.0-snapshot.20251106.0"
-	containerName        = "go-daml-test-canton"
-	containerLabelKey    = "go-daml-test"
-	containerLabelValue  = "canton-sandbox"
+	damlSandboxVersion  = "3.5.0-snapshot.20251106.0"
+	containerName       = "go-daml-test-canton"
+	containerLabelKey   = "go-daml-test"
+	containerLabelValue = "canton-sandbox"
 )
 
 var (
