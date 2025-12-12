@@ -112,8 +112,9 @@ type TopologyTransactionSignature struct {
 }
 
 type TopologyTransactionProposal struct {
-	Mapping TopologyMapping
-	Serial  uint32
+	Operation Operation
+	Mapping   TopologyMapping
+	Serial    uint32
 }
 
 type TopologyMapping interface {
@@ -136,10 +137,43 @@ type PartyToKeyMapping struct {
 
 func (*PartyToKeyMapping) isTopologyMapping() {}
 
+type SigningKeyScheme int32
+
+const (
+	SigningKeySchemeUnspecified SigningKeyScheme = 0
+	SigningKeySchemeED25519     SigningKeyScheme = 1
+	SigningKeySchemeECDSAP256   SigningKeyScheme = 2
+	SigningKeySchemeECDSAP384   SigningKeyScheme = 3
+)
+
+type SigningKeySpec int32
+
+const (
+	SigningKeySpecUnspecified SigningKeySpec = 0
+	SigningKeySpecCurve25519  SigningKeySpec = 1
+	SigningKeySpecP256        SigningKeySpec = 2
+	SigningKeySpecP384        SigningKeySpec = 3
+	SigningKeySpecSecp256k1   SigningKeySpec = 4
+)
+
+type SigningKeyUsage int32
+
+const (
+	SigningKeyUsageUnspecified             SigningKeyUsage = 0
+	SigningKeyUsageNamespace               SigningKeyUsage = 1
+	SigningKeyUsageIdentityDelegation      SigningKeyUsage = 2
+	SigningKeyUsageSequencerAuthentication SigningKeyUsage = 3
+	SigningKeyUsageProtocol                SigningKeyUsage = 4
+	SigningKeyUsageProofOfOwnership        SigningKeyUsage = 5
+)
+
 type PublicKey struct {
-	Format int32
-	Key    []byte
-	ID     string
+	Format  int32
+	Key     []byte
+	ID      string
+	Scheme  int32
+	KeySpec int32
+	Usage   []int32
 }
 
 type TopologyTransactionResult struct {

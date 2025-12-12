@@ -122,9 +122,10 @@ func (c *partyManagement) AllocateExternalParty(ctx context.Context, synchronize
 		sigs := make([]*v2.Signature, len(tx.Signatures))
 		for j, sig := range tx.Signatures {
 			sigs[j] = &v2.Signature{
-				Format:    v2.SignatureFormat(sig.Format),
-				Signature: sig.Signature,
-				SignedBy:  sig.SignedBy,
+				Format:               v2.SignatureFormat(sig.Format),
+				Signature:            sig.Signature,
+				SignedBy:             sig.SignedBy,
+				SigningAlgorithmSpec: v2.SigningAlgorithmSpec(sig.SigningAlgorithmSpec),
 			}
 		}
 		signedTxs[i] = &adminv2.AllocateExternalPartyRequest_SignedTransaction{
@@ -136,9 +137,10 @@ func (c *partyManagement) AllocateExternalParty(ctx context.Context, synchronize
 	multiSigs := make([]*v2.Signature, len(multiHashSignatures))
 	for i, sig := range multiHashSignatures {
 		multiSigs[i] = &v2.Signature{
-			Format:    v2.SignatureFormat(sig.Format),
-			Signature: sig.Signature,
-			SignedBy:  sig.SignedBy,
+			Format:               v2.SignatureFormat(sig.Format),
+			Signature:            sig.Signature,
+			SignedBy:             sig.SignedBy,
+			SigningAlgorithmSpec: v2.SigningAlgorithmSpec(sig.SigningAlgorithmSpec),
 		}
 	}
 

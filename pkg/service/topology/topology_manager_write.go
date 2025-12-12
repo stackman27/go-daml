@@ -74,6 +74,7 @@ func authorizeRequestToProto(req *model.AuthorizeRequest) *topov30.AuthorizeRequ
 	if req.Proposal != nil {
 		protoReq.Type = &topov30.AuthorizeRequest_Proposal_{
 			Proposal: &topov30.AuthorizeRequest_Proposal{
+				Change:  operationToProto(req.Proposal.Operation),
 				Mapping: topologyMappingToProto(req.Proposal.Mapping),
 				Serial:  req.Proposal.Serial,
 			},
@@ -315,9 +316,16 @@ func signingPublicKeyToProto(key *model.PublicKey) *cryptov30.SigningPublicKey {
 	if key == nil {
 		return nil
 	}
+	usage := make([]cryptov30.SigningKeyUsage, len(key.Usage))
+	for i, u := range key.Usage {
+		usage[i] = cryptov30.SigningKeyUsage(u)
+	}
 	return &cryptov30.SigningPublicKey{
 		Format:    cryptov30.CryptoKeyFormat(key.Format),
 		PublicKey: key.Key,
+		Scheme:    cryptov30.SigningKeyScheme(key.Scheme),
+		KeySpec:   cryptov30.SigningKeySpec(key.KeySpec),
+		Usage:     usage,
 	}
 }
 

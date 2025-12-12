@@ -47,7 +47,7 @@ func Setup(ctx context.Context) error {
 			log.Fatal().Err(err).Msg("Could not ping docker")
 		}
 
-		resDaml, grpcAddr = initDamlSandbox(ctx, dockerPool)
+		resDaml, grpcAddr, adminAddr = initDamlSandbox(ctx, dockerPool)
 
 		builder := client.NewDamlClient("", grpcAddr)
 		if strings.HasSuffix(grpcAddr, ":443") {
@@ -194,7 +194,7 @@ func findExistingContainer(pool *dockertest.Pool) (*dockertest.Resource, error) 
 	return resource, nil
 }
 
-func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockertest.Resource, string) {
+func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockertest.Resource, string, string) {
 	ledgerAPIPort := "6865"
 	adminAPIPort := "6866"
 
@@ -205,12 +205,15 @@ func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockert
 		mappedLedgerPort := existingResource.GetPort(ledgerAPIPort + "/tcp")
 		grpcAddr := fmt.Sprintf("127.0.0.1:%s", mappedLedgerPort)
 
+		mappedAdminPort := existingResource.GetPort(adminAPIPort + "/tcp")
+		adminAddr := fmt.Sprintf("127.0.0.1:%s", mappedAdminPort)
+
 		log.Info().Msgf("Reusing Canton sandbox, Ledger API (gRPC) on %s", grpcAddr)
 
 		if err := waitForPort(ctx, mappedLedgerPort, 30*time.Second); err != nil {
 			log.Warn().Err(err).Msg("Existing container not responsive, creating new one")
 		} else {
-			return existingResource, grpcAddr
+			return existingResource, grpcAddr, adminAddr
 		}
 	}
 
@@ -267,6 +270,7 @@ func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockert
 			"daml",
 			"sandbox",
 			"-c", "/canton/canton.conf",
+			"--debug",
 		},
 		ExposedPorts: []string{ledgerAPIPort + "/tcp", adminAPIPort + "/tcp"},
 		Mounts:       []string{fmt.Sprintf("%s:/canton/canton.conf:ro", configPath)},
@@ -286,8 +290,10 @@ func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockert
 			if findErr == nil && existingResource != nil {
 				mappedLedgerPort := existingResource.GetPort(ledgerAPIPort + "/tcp")
 				grpcAddr := fmt.Sprintf("127.0.0.1:%s", mappedLedgerPort)
+				mappedAdminPort := existingResource.GetPort(adminAPIPort + "/tcp")
+				adminAddr := fmt.Sprintf("127.0.0.1:%s", mappedAdminPort)
 				log.Info().Str("container", containerName).Msg("Successfully attached to existing container")
-				return existingResource, grpcAddr
+				return existingResource, grpcAddr, adminAddr
 			}
 			log.Fatal().Err(err).Msg("Container exists but could not attach to it")
 		}
@@ -318,7 +324,7 @@ func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockert
 		log.Fatal().Err(err).Msg("Canton sandbox initialization timeout")
 	}
 
-	return resource, grpcAddr
+	return resource, grpcAddr, adminAddr
 }
 
 func waitForPort(ctx context.Context, port string, timeout time.Duration) error {
