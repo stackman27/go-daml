@@ -23,14 +23,7 @@ func TestAllocateExternalParty(t *testing.T) {
 	cl := testutil.GetClient()
 	require.NotNil(t, cl)
 	require.NotNil(t, cl.PartyMng)
-
-	adminAddr := testutil.GetAdminAddr()
-	require.NotEmpty(t, adminAddr)
-
-	adminCl, err := client.NewDamlClient("", adminAddr).Build(ctx)
-	require.NoError(t, err)
-	defer adminCl.Close()
-	require.NotNil(t, adminCl.TopologyManagerWrite)
+	require.NotNil(t, cl.TopologyManagerWrite)
 
 	syncResp, err := cl.StateService.GetConnectedSynchronizers(ctx, &model.GetConnectedSynchronizersRequest{})
 	require.NoError(t, err)
@@ -52,7 +45,7 @@ func TestAllocateExternalParty(t *testing.T) {
 
 	onboardingTxs, multiHashSigs, err := createValidOnboardingTransactions(
 		ctx,
-		adminCl,
+		cl,
 		fullPartyID,
 		publicKey,
 		privateKey,

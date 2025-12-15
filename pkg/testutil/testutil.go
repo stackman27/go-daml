@@ -49,7 +49,7 @@ func Setup(ctx context.Context) error {
 
 		resDaml, grpcAddr, adminAddr = initDamlSandbox(ctx, dockerPool)
 
-		builder := client.NewDamlClient("", grpcAddr)
+		builder := client.NewDamlClient("", grpcAddr).WithAdminAddress(adminAddr)
 		if strings.HasSuffix(grpcAddr, ":443") {
 			tlsConfig := client.TlsConfig{}
 			builder = builder.WithTLSConfig(tlsConfig)
