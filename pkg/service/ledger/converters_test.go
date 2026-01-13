@@ -1409,7 +1409,7 @@ func TestConvertToRecordRELTIMEAndSETIntegration(t *testing.T) {
 
 func TestConvertToRecordTUPLE2(t *testing.T) {
 	t.Run("TUPLE2 type conversion - strings", func(t *testing.T) {
-		tuple2Value := types.TUPLE2{
+		tuple2Value := types.TUPLE2[string, string]{
 			First:  "hello",
 			Second: "world",
 		}
@@ -1437,7 +1437,7 @@ func TestConvertToRecordTUPLE2(t *testing.T) {
 	})
 
 	t.Run("TUPLE2 type conversion - integers", func(t *testing.T) {
-		tuple2Value := types.TUPLE2{
+		tuple2Value := types.TUPLE2[int64, int64]{
 			First:  int64(42),
 			Second: int64(100),
 		}
@@ -1465,7 +1465,7 @@ func TestConvertToRecordTUPLE2(t *testing.T) {
 	})
 
 	t.Run("TUPLE2 type conversion - mixed types", func(t *testing.T) {
-		tuple2Value := types.TUPLE2{
+		tuple2Value := types.TUPLE2[string, int64]{
 			First:  "text",
 			Second: int64(42),
 		}
@@ -1493,7 +1493,7 @@ func TestConvertToRecordTUPLE2(t *testing.T) {
 	})
 
 	t.Run("TUPLE2 type conversion - DAML types", func(t *testing.T) {
-		tuple2Value := types.TUPLE2{
+		tuple2Value := types.TUPLE2[types.PARTY, types.TEXT]{
 			First:  types.PARTY("alice"),
 			Second: types.TEXT("test"),
 		}
@@ -1522,20 +1522,20 @@ func TestConvertToRecordTUPLE2(t *testing.T) {
 
 	t.Run("TUPLE2 in struct", func(t *testing.T) {
 		type TestTuple2Struct struct {
-			Owner      types.PARTY  `json:"owner"`
-			Coordinate types.TUPLE2 `json:"coordinate"`
-			Name       types.TEXT   `json:"name"`
-			Pair       types.TUPLE2 `json:"pair"`
+			Owner      types.PARTY                  `json:"owner"`
+			Coordinate types.TUPLE2[int64, int64]   `json:"coordinate"`
+			Name       types.TEXT                   `json:"name"`
+			Pair       types.TUPLE2[string, string] `json:"pair"`
 		}
 
 		testData := TestTuple2Struct{
 			Owner: types.PARTY("alice"),
-			Coordinate: types.TUPLE2{
+			Coordinate: types.TUPLE2[int64, int64]{
 				First:  int64(100),
 				Second: int64(200),
 			},
 			Name: types.TEXT("test tuple2"),
-			Pair: types.TUPLE2{
+			Pair: types.TUPLE2[string, string]{
 				First:  "key",
 				Second: "value",
 			},
@@ -1583,12 +1583,12 @@ func TestConvertToRecordTUPLE2(t *testing.T) {
 	})
 
 	t.Run("Nested TUPLE2", func(t *testing.T) {
-		innerTuple := types.TUPLE2{
+		innerTuple := types.TUPLE2[string, string]{
 			First:  "inner1",
 			Second: "inner2",
 		}
 
-		outerTuple := types.TUPLE2{
+		outerTuple := types.TUPLE2[types.TUPLE2[string, string], int64]{
 			First:  innerTuple,
 			Second: int64(999),
 		}
@@ -1626,7 +1626,7 @@ func TestConvertToRecordTUPLE2(t *testing.T) {
 	})
 
 	t.Run("TUPLE2 with complex DAML types", func(t *testing.T) {
-		tuple2Value := types.TUPLE2{
+		tuple2Value := types.TUPLE2[types.RELTIME, types.SET]{
 			First:  types.RELTIME(30 * time.Second),
 			Second: types.SET{"alice", "bob", "charlie"},
 		}
@@ -1663,13 +1663,13 @@ func TestConvertToRecordTUPLE2(t *testing.T) {
 func TestConvertToRecordRELTIMEAndSETAndTUPLE2Integration(t *testing.T) {
 	t.Run("RELTIME, SET, and TUPLE2 in same struct", func(t *testing.T) {
 		type TestFullIntegrationStruct struct {
-			Owner             types.PARTY   `json:"owner"`
-			TickDuration      types.RELTIME `json:"tickDuration"`
-			RequiredParties   types.SET     `json:"requiredParties"`
-			Name              types.TEXT    `json:"name"`
-			Coordinate        types.TUPLE2  `json:"coordinate"`
-			MaxProcessingTime types.RELTIME `json:"maxProcessingTime"`
-			Metadata          types.TUPLE2  `json:"metadata"`
+			Owner             types.PARTY                  `json:"owner"`
+			TickDuration      types.RELTIME                `json:"tickDuration"`
+			RequiredParties   types.SET                    `json:"requiredParties"`
+			Name              types.TEXT                   `json:"name"`
+			Coordinate        types.TUPLE2[int64, int64]   `json:"coordinate"`
+			MaxProcessingTime types.RELTIME                `json:"maxProcessingTime"`
+			Metadata          types.TUPLE2[string, string] `json:"metadata"`
 		}
 
 		testData := TestFullIntegrationStruct{
@@ -1677,12 +1677,12 @@ func TestConvertToRecordRELTIMEAndSETAndTUPLE2Integration(t *testing.T) {
 			TickDuration:    types.RELTIME(10 * time.Second),
 			RequiredParties: types.SET{"alice", "bob", "charlie"},
 			Name:            types.TEXT("full integration test"),
-			Coordinate: types.TUPLE2{
+			Coordinate: types.TUPLE2[int64, int64]{
 				First:  int64(100),
 				Second: int64(200),
 			},
 			MaxProcessingTime: types.RELTIME(5 * time.Minute),
-			Metadata: types.TUPLE2{
+			Metadata: types.TUPLE2[string, string]{
 				First:  "version",
 				Second: "1.0.0",
 			},

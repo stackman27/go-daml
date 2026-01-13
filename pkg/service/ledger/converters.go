@@ -23,6 +23,22 @@ import (
 
 var defaultJsonCodec = codec.NewJsonCodec()
 
+func isTuple2(v reflect.Value) bool {
+	if v.Kind() == reflect.Struct && v.NumField() == 2 {
+		t := v.Type()
+		return t.Field(0).Name == "First" && t.Field(1).Name == "Second"
+	}
+	return false
+}
+
+func isTuple3(v reflect.Value) bool {
+	if v.Kind() == reflect.Struct && v.NumField() == 3 {
+		t := v.Type()
+		return t.Field(0).Name == "First" && t.Field(1).Name == "Second" && t.Field(2).Name == "Third"
+	}
+	return false
+}
+
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
 	trimmed := strings.TrimPrefix(templateID, "#")
 	parts := strings.Split(trimmed, ":")
@@ -407,22 +423,6 @@ func mapToValue(data interface{}) *v2.Value {
 				List: &v2.List{Elements: elements},
 			},
 		}
-	case types.TUPLE2:
-		fields := []*v2.RecordField{
-			{
-				Label: "_1",
-				Value: mapToValue(v.First),
-			},
-			{
-				Label: "_2",
-				Value: mapToValue(v.Second),
-			},
-		}
-		return &v2.Value{
-			Sum: &v2.Value_Record{
-				Record: &v2.Record{Fields: fields},
-			},
-		}
 	case []types.INT64, []types.TEXT, []types.BOOL, []int64, []string:
 		rv := reflect.ValueOf(v)
 		elements := make([]*v2.Value, rv.Len())
@@ -462,6 +462,28 @@ func mapToValue(data interface{}) *v2.Value {
 			return nil
 		}
 		return mapToValue(val.Elem().Interface())
+	}
+
+	rv := reflect.ValueOf(data)
+	if isTuple2(rv) {
+		first := rv.Field(0).Interface()
+		second := rv.Field(1).Interface()
+		fields := []*v2.RecordField{
+			{Label: "_1", Value: mapToValue(first)},
+			{Label: "_2", Value: mapToValue(second)},
+		}
+		return &v2.Value{Sum: &v2.Value_Record{Record: &v2.Record{Fields: fields}}}
+	}
+	if isTuple3(rv) {
+		first := rv.Field(0).Interface()
+		second := rv.Field(1).Interface()
+		third := rv.Field(2).Interface()
+		fields := []*v2.RecordField{
+			{Label: "_1", Value: mapToValue(first)},
+			{Label: "_2", Value: mapToValue(second)},
+			{Label: "_3", Value: mapToValue(third)},
+		}
+		return &v2.Value{Sum: &v2.Value_Record{Record: &v2.Record{Fields: fields}}}
 	}
 
 	// Handle custom types before other type checking
