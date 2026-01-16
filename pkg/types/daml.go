@@ -20,6 +20,7 @@ type (
 	MAP                map[string]interface{}
 	OPTIONAL           *interface{}
 	GENMAP             map[string]interface{}
+	TEXTMAP            map[string]string
 	CONTRACT_ID        string
 	RELTIME            time.Duration
 	SET                []interface{}
