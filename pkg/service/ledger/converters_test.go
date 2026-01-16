@@ -1741,7 +1741,7 @@ func TestConvertToRecordRELTIMEAndSETAndTUPLE2Integration(t *testing.T) {
 }
 
 func TestConvertToRecordGENMAP(t *testing.T) {
-	t.Run("GENMAP with string values converts to TextMap", func(t *testing.T) {
+	t.Run("GENMAP with string values converts to GenMap", func(t *testing.T) {
 		genMapData := map[string]interface{}{
 			"_type": "genmap",
 			"value": map[string]interface{}{
@@ -1760,13 +1760,14 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "genmap", record.Fields[0].Label)
 
-		textMap := record.Fields[0].Value.GetTextMap()
-		require.NotNil(t, textMap)
-		require.Len(t, textMap.Entries, 3)
+		genMap := record.Fields[0].Value.GetGenMap()
+		require.NotNil(t, genMap)
+		require.Len(t, genMap.Entries, 3)
 
 		entriesMap := make(map[string]string)
-		for _, entry := range textMap.Entries {
-			entriesMap[entry.Key] = entry.Value.GetText()
+		for _, entry := range genMap.Entries {
+			key := entry.Key.GetText()
+			entriesMap[key] = entry.Value.GetText()
 		}
 
 		require.Equal(t, "value1", entriesMap["key1"])
@@ -1861,9 +1862,9 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "emptyMap", record.Fields[0].Label)
 
-		textMap := record.Fields[0].Value.GetTextMap()
-		require.NotNil(t, textMap)
-		require.Len(t, textMap.Entries, 0)
+		genMap := record.Fields[0].Value.GetGenMap()
+		require.NotNil(t, genMap)
+		require.Len(t, genMap.Entries, 0)
 	})
 
 	t.Run("GENMAP in struct", func(t *testing.T) {
@@ -1913,9 +1914,9 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
 		require.Equal(t, "genmap test", fieldMap["name"].Value.GetText())
 
-		stringTextMap := fieldMap["stringMap"].Value.GetTextMap()
-		require.NotNil(t, stringTextMap)
-		require.Len(t, stringTextMap.Entries, 2)
+		stringGenMap := fieldMap["stringMap"].Value.GetGenMap()
+		require.NotNil(t, stringGenMap)
+		require.Len(t, stringGenMap.Entries, 2)
 
 		mixedGenMap := fieldMap["mixedMap"].Value.GetGenMap()
 		require.NotNil(t, mixedGenMap)
@@ -1956,132 +1957,6 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 		require.Equal(t, "alice", entriesMap["name"].GetText())
 		require.Equal(t, int64(30), entriesMap["age"].GetInt64())
 		require.Equal(t, true, entriesMap["active"].GetBool())
-	})
-}
-
-func TestConvertToRecordTEXTMAP(t *testing.T) {
-	t.Run("TextMap with string values", func(t *testing.T) {
-		textMapData := map[string]interface{}{
-			"_type": "genmap",
-			"value": map[string]interface{}{
-				"firstName": "John",
-				"lastName":  "Doe",
-				"email":     "john@example.com",
-			},
-		}
-
-		data := make(map[string]interface{})
-		data["textmap"] = textMapData
-
-		record := convertToRecord(data)
-
-		require.NotNil(t, record)
-		require.Len(t, record.Fields, 1)
-		require.Equal(t, "textmap", record.Fields[0].Label)
-
-		textMap := record.Fields[0].Value.GetTextMap()
-		require.NotNil(t, textMap)
-		require.Len(t, textMap.Entries, 3)
-
-		entriesMap := make(map[string]string)
-		for _, entry := range textMap.Entries {
-			entriesMap[entry.Key] = entry.Value.GetText()
-		}
-
-		require.Equal(t, "John", entriesMap["firstName"])
-		require.Equal(t, "Doe", entriesMap["lastName"])
-		require.Equal(t, "john@example.com", entriesMap["email"])
-	})
-
-	t.Run("TextMap in struct with multiple maps", func(t *testing.T) {
-		type TestTextMapStruct struct {
-			Owner    types.PARTY `json:"owner"`
-			Metadata interface{} `json:"metadata"`
-			Labels   interface{} `json:"labels"`
-			Name     types.TEXT  `json:"name"`
-		}
-
-		testData := TestTextMapStruct{
-			Owner: types.PARTY("alice"),
-			Metadata: map[string]interface{}{
-				"_type": "genmap",
-				"value": map[string]interface{}{
-					"version": "1.0.0",
-					"env":     "production",
-				},
-			},
-			Labels: map[string]interface{}{
-				"_type": "genmap",
-				"value": map[string]interface{}{
-					"region": "us-east",
-					"zone":   "a",
-				},
-			},
-			Name: types.TEXT("textmap test"),
-		}
-
-		data := make(map[string]interface{})
-		data["testStruct"] = testData
-
-		record := convertToRecord(data)
-
-		require.NotNil(t, record)
-		require.Len(t, record.Fields, 1)
-
-		structRecord := record.Fields[0].Value.GetRecord()
-		require.NotNil(t, structRecord)
-		require.Len(t, structRecord.Fields, 4)
-
-		fieldMap := make(map[string]*v2.RecordField)
-		for _, field := range structRecord.Fields {
-			fieldMap[field.Label] = field
-		}
-
-		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
-		require.Equal(t, "textmap test", fieldMap["name"].Value.GetText())
-
-		metadataTextMap := fieldMap["metadata"].Value.GetTextMap()
-		require.NotNil(t, metadataTextMap)
-		require.Len(t, metadataTextMap.Entries, 2)
-
-		labelsTextMap := fieldMap["labels"].Value.GetTextMap()
-		require.NotNil(t, labelsTextMap)
-		require.Len(t, labelsTextMap.Entries, 2)
-	})
-
-	t.Run("TextMap with types.TEXT values", func(t *testing.T) {
-		genMapValue := types.GENMAP{
-			"greeting": "hello",
-			"farewell": "goodbye",
-			"thanks":   "thank you",
-		}
-
-		textMapData := map[string]interface{}{
-			"_type": "genmap",
-			"value": genMapValue,
-		}
-
-		data := make(map[string]interface{})
-		data["phrases"] = textMapData
-
-		record := convertToRecord(data)
-
-		require.NotNil(t, record)
-		require.Len(t, record.Fields, 1)
-		require.Equal(t, "phrases", record.Fields[0].Label)
-
-		textMap := record.Fields[0].Value.GetTextMap()
-		require.NotNil(t, textMap)
-		require.Len(t, textMap.Entries, 3)
-
-		entriesMap := make(map[string]string)
-		for _, entry := range textMap.Entries {
-			entriesMap[entry.Key] = entry.Value.GetText()
-		}
-
-		require.Equal(t, "hello", entriesMap["greeting"])
-		require.Equal(t, "goodbye", entriesMap["farewell"])
-		require.Equal(t, "thank you", entriesMap["thanks"])
 	})
 }
 
@@ -2126,14 +2001,16 @@ func TestConvertToRecordOptionalWithMaps(t *testing.T) {
 	})
 
 	t.Run("Optional with TextMap", func(t *testing.T) {
+		textMapValue := map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		}
+
 		optionalData := map[string]interface{}{
 			"_type": "optional",
 			"value": map[string]interface{}{
-				"_type": "genmap",
-				"value": map[string]interface{}{
-					"key1": "value1",
-					"key2": "value2",
-				},
+				"_type": "textmap",
+				"value": textMapValue,
 			},
 		}
 
@@ -2239,9 +2116,9 @@ func TestConvertToRecordOptionalWithMaps(t *testing.T) {
 		optStringMap := fieldMap["maybeStringMap"].Value.GetOptional()
 		require.NotNil(t, optStringMap)
 		require.NotNil(t, optStringMap.Value)
-		stringTextMap := optStringMap.Value.GetTextMap()
-		require.NotNil(t, stringTextMap)
-		require.Len(t, stringTextMap.Entries, 2)
+		stringGenMap := optStringMap.Value.GetGenMap()
+		require.NotNil(t, stringGenMap)
+		require.Len(t, stringGenMap.Entries, 2)
 
 		optMixedMap := fieldMap["maybeMixedMap"].Value.GetOptional()
 		require.NotNil(t, optMixedMap)
@@ -2301,9 +2178,9 @@ func TestConvertToRecordNestedMaps(t *testing.T) {
 		require.NotNil(t, configGenMap)
 		require.Len(t, configGenMap.Entries, 2)
 
-		metadataTextMap := entriesMap["metadata"].GetTextMap()
-		require.NotNil(t, metadataTextMap)
-		require.Len(t, metadataTextMap.Entries, 2)
+		metadataGenMap := entriesMap["metadata"].GetGenMap()
+		require.NotNil(t, metadataGenMap)
+		require.Len(t, metadataGenMap.Entries, 2)
 	})
 
 	t.Run("Map with complex nested structure", func(t *testing.T) {
@@ -2347,7 +2224,7 @@ func TestConvertToRecordNestedMaps(t *testing.T) {
 		require.Equal(t, int64(2), listValue.Elements[1].GetInt64())
 		require.Equal(t, int64(3), listValue.Elements[2].GetInt64())
 
-		innerMap := entriesMap["map"].GetTextMap()
+		innerMap := entriesMap["map"].GetGenMap()
 		require.NotNil(t, innerMap)
 		require.Len(t, innerMap.Entries, 1)
 
@@ -2393,10 +2270,15 @@ func TestConvertToRecordNestedMaps(t *testing.T) {
 		require.NotNil(t, optionalValue)
 		require.NotNil(t, optionalValue.Value)
 
-		innerTextMap := optionalValue.Value.GetTextMap()
-		require.NotNil(t, innerTextMap)
-		require.Len(t, innerTextMap.Entries, 1)
-		require.Equal(t, "key", innerTextMap.Entries[0].Key)
-		require.Equal(t, "value", innerTextMap.Entries[0].Value.GetText())
+		innerGenMap := optionalValue.Value.GetGenMap()
+		require.NotNil(t, innerGenMap)
+		require.Len(t, innerGenMap.Entries, 1)
+
+		innerEntries := make(map[string]*v2.Value)
+		for _, entry := range innerGenMap.Entries {
+			key := entry.Key.GetText()
+			innerEntries[key] = entry.Value
+		}
+		require.Equal(t, "value", innerEntries["key"].GetText())
 	})
 }

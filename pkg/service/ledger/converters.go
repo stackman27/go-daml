@@ -563,6 +563,15 @@ func mapToValue(data interface{}) *v2.Value {
 				return getMapConvert(genMapValue)
 			}
 		}
+
+		if typeStr, ok := v["_type"].(string); ok && typeStr == "textmap" {
+			if mapValue, ok := v["value"].(map[string]string); ok {
+				return getTextMapConvert(mapValue)
+			} else if textMapValue, ok := v["value"].(types.TEXTMAP); ok {
+				return getTextMapConvert(textMapValue)
+			}
+		}
+
 		fields := make([]*v2.RecordField, 0, len(v))
 		for key, val := range v {
 			if key != "_type" && key != "value" {
@@ -623,44 +632,36 @@ func mapToValue(data interface{}) *v2.Value {
 }
 
 func getMapConvert(genMapValue map[string]interface{}) *v2.Value {
-	allTextValues := true
-	for _, val := range genMapValue {
-		if _, ok := val.(string); !ok {
-			allTextValues = false
-			break
-		}
+	entries := make([]*v2.GenMap_Entry, 0, len(genMapValue))
+	for key, val := range genMapValue {
+		entries = append(entries, &v2.GenMap_Entry{
+			Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
+			Value: mapToValue(val),
+		})
 	}
+	return &v2.Value{
+		Sum: &v2.Value_GenMap{
+			GenMap: &v2.GenMap{
+				Entries: entries,
+			},
+		},
+	}
+}
 
-	if allTextValues {
-		textMapEntries := make([]*v2.TextMap_Entry, 0, len(genMapValue))
-		for key, val := range genMapValue {
-			textMapEntries = append(textMapEntries, &v2.TextMap_Entry{
-				Key:   key,
-				Value: mapToValue(val),
-			})
-		}
-		return &v2.Value{
-			Sum: &v2.Value_TextMap{
-				TextMap: &v2.TextMap{
-					Entries: textMapEntries,
-				},
+func getTextMapConvert(values map[string]string) *v2.Value {
+	entries := make([]*v2.TextMap_Entry, 0, len(values))
+	for key, val := range values {
+		entries = append(entries, &v2.TextMap_Entry{
+			Key:   key,
+			Value: &v2.Value{Sum: &v2.Value_Text{Text: val}},
+		})
+	}
+	return &v2.Value{
+		Sum: &v2.Value_TextMap{
+			TextMap: &v2.TextMap{
+				Entries: entries,
 			},
-		}
-	} else {
-		entries := make([]*v2.GenMap_Entry, 0, len(genMapValue))
-		for key, val := range genMapValue {
-			entries = append(entries, &v2.GenMap_Entry{
-				Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
-				Value: mapToValue(val),
-			})
-		}
-		return &v2.Value{
-			Sum: &v2.Value_GenMap{
-				GenMap: &v2.GenMap{
-					Entries: entries,
-				},
-			},
-		}
+		},
 	}
 }
 
