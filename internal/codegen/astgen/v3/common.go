@@ -476,24 +476,17 @@ func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
 			return "unknown_interned_type"
 		}
 
-		// TODO: add other types here
 		isConType := prim.GetCon()
 		if isConType != nil {
-			tyconName := c.getName(pkg, isConType.Tycon.GetNameInternedDname())
-			fieldType = tyconName
+			fieldType = c.handleConType(pkg, isConType)
 		} else if builtinType := prim.GetBuiltin(); builtinType != nil {
 			fieldType = c.handleBuiltinType(pkg, builtinType)
 		} else {
 			fieldType = prim.String()
 		}
 	case *daml.Type_Con_:
-		if v.Con.Tycon != nil {
-			fieldType = c.getName(pkg, v.Con.Tycon.GetNameInternedDname())
-		} else {
-			fieldType = "con_without_tycon"
-		}
+		fieldType = c.handleConType(pkg, v.Con)
 	case *daml.Type_Var_:
-		// For variables, we use the interned string directly
 		if int(v.Var.GetVarInternedStr()) < len(pkg.InternedStrings) {
 			fieldType = pkg.InternedStrings[v.Var.GetVarInternedStr()]
 		} else {
@@ -533,11 +526,53 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, builtinType *daml.Type
 	case daml.BuiltinType_GENMAP:
 		return "GENMAP"
 	case daml.BuiltinType_TEXTMAP:
-		return "TEXTMAP"
+		return "GENMAP"
 	case daml.BuiltinType_CONTRACT_ID:
 		return RawTypeContractID
 	default:
 		return builtinName
+	}
+}
+
+func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) string {
+	if conType == nil || conType.Tycon == nil {
+		return "con_without_tycon"
+	}
+
+	tyconName := c.getName(pkg, conType.Tycon.GetNameInternedDname())
+
+	switch tyconName {
+	case "Optional":
+		if len(conType.Args) > 0 {
+			elementType := c.extractType(pkg, conType.Args[0])
+			normalizedElementType := model.NormalizeDAMLType(elementType)
+			return "*" + normalizedElementType
+		}
+		return RawTypeOptional
+	case "List":
+		if len(conType.Args) > 0 {
+			elementType := c.extractType(pkg, conType.Args[0])
+			normalizedElementType := model.NormalizeDAMLType(elementType)
+			return "[]" + normalizedElementType
+		}
+		return RawTypeList
+	case "Tuple2":
+		if len(conType.Args) >= 2 {
+			arg1Type := c.extractType(pkg, conType.Args[0])
+			arg2Type := c.extractType(pkg, conType.Args[1])
+			return "TUPLE2[" + model.NormalizeDAMLType(arg1Type) + "," + model.NormalizeDAMLType(arg2Type) + "]"
+		}
+		return "TUPLE2"
+	case "Tuple3":
+		if len(conType.Args) >= 3 {
+			arg1Type := c.extractType(pkg, conType.Args[0])
+			arg2Type := c.extractType(pkg, conType.Args[1])
+			arg3Type := c.extractType(pkg, conType.Args[2])
+			return "TUPLE3[" + model.NormalizeDAMLType(arg1Type) + "," + model.NormalizeDAMLType(arg2Type) + "," + model.NormalizeDAMLType(arg3Type) + "]"
+		}
+		return "TUPLE3"
+	default:
+		return tyconName
 	}
 }
 
@@ -566,8 +601,7 @@ func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) 
 		if prim != nil {
 			isConType := prim.GetCon()
 			if isConType != nil {
-				tyconName := c.getName(pkg, isConType.Tycon.GetNameInternedDname())
-				fieldType = tyconName
+				fieldType = c.handleConType(pkg, isConType)
 			} else if builtinType := prim.GetBuiltin(); builtinType != nil {
 				fieldType = c.handleBuiltinType(pkg, builtinType)
 			} else {
@@ -577,11 +611,7 @@ func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) 
 			fieldType = "complex_interned_type"
 		}
 	case *daml.Type_Con_:
-		if v.Con.Tycon != nil {
-			fieldType = c.getName(pkg, v.Con.Tycon.GetNameInternedDname())
-		} else {
-			fieldType = "con_without_tycon"
-		}
+		fieldType = c.handleConType(pkg, v.Con)
 	case *daml.Type_Var_:
 		switch {
 		case v.Var.GetVarInternedStr() != 0:
