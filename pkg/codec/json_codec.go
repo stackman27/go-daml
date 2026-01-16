@@ -113,6 +113,8 @@ func (codec *JsonCodec) toDynamicValue(value interface{}) (interface{}, error) {
 		return codec.setToDynamicValue(v)
 	case types.GENMAP:
 		return codec.genMapToDynamicValue(v)
+	case types.TEXTMAP:
+		return codec.textMapToDynamicValue(v)
 	case types.MAP:
 		return codec.mapToDynamicValue(v)
 	case types.LIST:
@@ -289,6 +291,14 @@ func (codec *JsonCodec) tuple3ToDynamicValueFromReflect(rv reflect.Value) (inter
 
 func (codec *JsonCodec) genMapToDynamicValue(gm types.GENMAP) (interface{}, error) {
 	return codec.mapToDynamicValueGeneric(gm)
+}
+
+func (codec *JsonCodec) textMapToDynamicValue(tm types.TEXTMAP) (interface{}, error) {
+	result := make(map[string]string)
+	for k, v := range tm {
+		result[k] = v
+	}
+	return result, nil
 }
 
 func (codec *JsonCodec) mapToDynamicValue(m types.MAP) (interface{}, error) {
@@ -536,6 +546,9 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 	case reflect.TypeOf(types.GENMAP{}):
 		return codec.assignGenMapValue(jsonValue, target)
 
+	case reflect.TypeOf(types.TEXTMAP{}):
+		return codec.assignTextMapValue(jsonValue, target)
+
 	case reflect.TypeOf(types.MAP{}):
 		return codec.assignMapValue(jsonValue, target)
 
@@ -743,6 +756,22 @@ func (codec *JsonCodec) assignGenMapValue(jsonValue interface{}, target reflect.
 		return nil
 	}
 	return fmt.Errorf("expected object for GENMAP, got %T", jsonValue)
+}
+
+func (codec *JsonCodec) assignTextMapValue(jsonValue interface{}, target reflect.Value) error {
+	if m, ok := jsonValue.(map[string]interface{}); ok {
+		result := make(types.TEXTMAP)
+		for k, v := range m {
+			if str, ok := v.(string); ok {
+				result[k] = str
+			} else {
+				result[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		target.Set(reflect.ValueOf(result))
+		return nil
+	}
+	return fmt.Errorf("expected object for TEXTMAP, got %T", jsonValue)
 }
 
 func (codec *JsonCodec) assignMapValue(jsonValue interface{}, target reflect.Value) error {

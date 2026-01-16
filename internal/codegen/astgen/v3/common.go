@@ -526,7 +526,7 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, builtinType *daml.Type
 	case daml.BuiltinType_GENMAP:
 		return "GENMAP"
 	case daml.BuiltinType_TEXTMAP:
-		return "GENMAP"
+		return "TEXTMAP"
 	case daml.BuiltinType_CONTRACT_ID:
 		return RawTypeContractID
 	default:
