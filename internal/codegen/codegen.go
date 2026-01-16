@@ -282,7 +282,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 			}
 		}
 
-		code, err := Bind(pkgFile, pkg.Name, dalfManifest.SdkVersion, pkg.Structs, dalf == dalfManifest.MainDalf)
+		code, err := Bind(pkgFile, pkg.PackageID, dalfManifest.SdkVersion, pkg.Structs, dalf == dalfManifest.MainDalf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate Go code: %w", err)
 		}
@@ -335,13 +335,12 @@ func GetAST(payload []byte, manifest *model.Manifest, ifcByModule map[string]mod
 		return nil, fmt.Errorf("could not extract package ID from MainDalf: %s", manifest.MainDalf)
 	}
 
-	packageName := manifest.Name
-	if packageName == "" {
-		packageName = getPackageName(manifest.MainDalf)
-	}
+	// packageName := manifest.Name
+	// if packageName == "" {
+	// 	packageName = getPackageName(manifest.MainDalf)
+	// }
 
 	return &model.Package{
-		Name:      packageName,
 		PackageID: packageID,
 		Structs:   structs,
 	}, nil

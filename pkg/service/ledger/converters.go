@@ -466,6 +466,20 @@ func mapToValue(data interface{}) *v2.Value {
 
 	// Handle custom types before other type checking
 	switch v := data.(type) {
+	case types.TEXTMAP:
+		entries := make([]*v2.TextMap_Entry, 0, len(v))
+		for k, val := range v {
+			entries = append(entries, &v2.TextMap_Entry{
+				Key:   k,
+				Value: mapToValue(val),
+			})
+		}
+		return &v2.Value{
+			Sum: &v2.Value_TextMap{
+				TextMap: &v2.TextMap{Entries: entries},
+			},
+		}
+
 	case types.INT64:
 		return &v2.Value{Sum: &v2.Value_Int64{Int64: int64(v)}}
 	case types.TEXT:

@@ -18,10 +18,9 @@ var (
 )
 
 {{if .IsMainDalf}}
+const PackageID = "{{.PackageID}}"
 const SDKVersion = "{{.SdkVersion}}"
-
-const packageName = "{{.PackageName}}"
-
+ 
 type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
@@ -126,7 +125,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 	// GetEnumTypeID implements types.ENUM interface
 	func (e {{capitalise .Name}}) GetEnumTypeID() string {
-		return fmt.Sprintf("#%s:%s:%s", packageName, "{{.ModuleName}}", "{{capitalise .Name}}")
+		return fmt.Sprintf("#%s:%s:%s", PackageID, "{{.ModuleName}}", "{{capitalise .Name}}")
 	}
 
 	// MarshalJSON implements custom JSON marshaling for {{capitalise .Name}} using JsonCodec
@@ -175,7 +174,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 	// GetTemplateID returns the template ID for this template
 	func (t {{capitalise .Name}}) GetTemplateID() string {
-		return fmt.Sprintf("#%s:%s:%s", packageName, "{{.ModuleName}}", "{{capitalise .Name}}")
+		return fmt.Sprintf("#%s:%s:%s", PackageID, "{{.ModuleName}}", "{{capitalise .Name}}")
 	}
 
 	// CreateCommand returns a CreateCommand for this template
@@ -193,7 +192,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 				"_type": "optional",
 			}
 		}
-		{{else if or $field.IsEnum (eq $field.Type "GENMAP") (eq $field.Type "MAP") (eq $field.Type "LIST") (eq $field.Type "NUMERIC") (eq $field.Type "DECIMAL")}}
+		{{else if or $field.IsEnum (eq $field.Type "GENMAP") (eq $field.Type "MAP") (eq $field.Type "LIST") (stringsHasPrefix $field.Type "[]") (eq $field.Type "NUMERIC") (eq $field.Type "DECIMAL")}}
 		if {{template "fieldIsNotEmpty" $field}} {
 			args["{{$field.Name}}"] = {{template "fieldToDAMLValue" $field}}
 		}{{else}}
@@ -240,7 +239,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract{{if ne $choice.InterfaceName ""}} via the {{capitalise $choice.InterfaceName}} interface{{end}}
 	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
 		return &model.ExerciseCommand{
-			{{if ne $choice.InterfaceName ""}}TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "{{$moduleName}}", "{{capitalise $choice.InterfaceDAMLName}}"),{{else}}TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "{{$moduleName}}", "{{capitalise $templateName}}"),{{end}}
+			{{if ne $choice.InterfaceName ""}}TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $choice.InterfaceDAMLName}}"),{{else}}TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),{{end}}
 			ContractID: contractID,
 			Choice: "{{$choice.Name}}",
 			{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
@@ -268,15 +267,110 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 // {{capitalise $interfaceName}}InterfaceID returns the interface ID for the {{capitalise $interfaceName}} interface
 func {{capitalise $interfaceName}}InterfaceID(packageID *string) string {
-	pkgName := packageName
+	pkgID := PackageID
 	if packageID != nil {
-		pkgName = *packageID
+		pkgID = *packageID
 	}
-	return fmt.Sprintf("#%s:%s:%s", pkgName, "{{$moduleName}}", "{{capitalise $damlName}}")
+	return fmt.Sprintf("#%s:%s:%s", pkgID, "{{$moduleName}}", "{{capitalise $damlName}}")
 }
 {{end}}
 {{end}}
 
-{{define "fieldToDAMLValue"}}{{if .IsOptional}}{{$baseType := stringsTrimPrefix .Type "*"}}{{if eq $baseType "INT64"}}int64(*t.{{capitalise .Name}}){{else if eq $baseType "TEXT"}}string(*t.{{capitalise .Name}}){{else if eq $baseType "BOOL"}}bool(*t.{{capitalise .Name}}){{else if eq $baseType "PARTY"}}(*t.{{capitalise .Name}}).ToMap(){{else if eq $baseType "NUMERIC"}}(*big.Int)(*t.{{capitalise .Name}}){{else if eq $baseType "DECIMAL"}}(*big.Int)(*t.{{capitalise .Name}}){{else if eq $baseType "DATE"}}*t.{{capitalise .Name}}{{else if eq $baseType "TIMESTAMP"}}*t.{{capitalise .Name}}{{else if eq $baseType "UNIT"}}map[string]interface{}{"_type": "unit"}{{else}}*t.{{capitalise .Name}}{{end}}{{else if eq .Type "PARTY"}}t.{{capitalise .Name}}.ToMap(){{else if eq .Type "TEXT"}}string(t.{{capitalise .Name}}){{else if eq .Type "INT64"}}int64(t.{{capitalise .Name}}){{else if eq .Type "BOOL"}}bool(t.{{capitalise .Name}}){{else if eq .Type "NUMERIC"}}(*big.Int)(t.{{capitalise .Name}}){{else if eq .Type "DECIMAL"}}(*big.Int)(t.{{capitalise .Name}}){{else if eq .Type "DATE"}}t.{{capitalise .Name}}{{else if eq .Type "TIMESTAMP"}}t.{{capitalise .Name}}{{else if eq .Type "UNIT"}}map[string]interface{}{"_type": "unit"}{{else if eq .Type "LIST"}}t.{{capitalise .Name}}{{else if eq .Type "GENMAP"}}map[string]interface{}{"_type": "genmap", "value": t.{{capitalise .Name}}}{{else if eq .Type "MAP"}}t.{{capitalise .Name}}{{else if eq .Type "OPTIONAL"}}t.{{capitalise .Name}}{{else if eq .Type "string"}}string(t.{{capitalise .Name}}){{else}}t.{{capitalise .Name}}{{end}}{{end}}
+{{define "fieldToDAMLValue"}}
+{{- if .IsOptional -}}
+  {{$baseType := stringsTrimPrefix .Type "*"}}
+  {{- if eq $baseType "INT64" -}}int64(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "TEXT" -}}string(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "BOOL" -}}bool(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "PARTY" -}}(*t.{{capitalise .Name}}).ToMap()
+  {{- else if eq $baseType "NUMERIC" -}}(*big.Int)(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "DECIMAL" -}}(*big.Int)(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "DATE" -}}*t.{{capitalise .Name}}
+  {{- else if eq $baseType "TIMESTAMP" -}}*t.{{capitalise .Name}}
+  {{- else if eq $baseType "UNIT" -}}map[string]interface{}{"_type": "unit"}
+  {{- else -}}*t.{{capitalise .Name}}
+  {{- end -}}
+{{- else -}}
+  {{- if eq .Type "PARTY" -}}t.{{capitalise .Name}}.ToMap()
+  {{- else if eq .Type "TEXT" -}}string(t.{{capitalise .Name}})
+  {{- else if eq .Type "INT64" -}}int64(t.{{capitalise .Name}})
+  {{- else if eq .Type "BOOL" -}}bool(t.{{capitalise .Name}})
+  {{- else if eq .Type "NUMERIC" -}}(*big.Int)(t.{{capitalise .Name}})
+  {{- else if eq .Type "DECIMAL" -}}(*big.Int)(t.{{capitalise .Name}})
+  {{- else if eq .Type "DATE" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type "TIMESTAMP" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type "UNIT" -}}map[string]interface{}{"_type": "unit"}
 
-{{define "fieldIsNotEmpty"}}{{if eq .Type "PARTY"}}t.{{capitalise .Name}} != ""{{else if eq .Type "TEXT"}}t.{{capitalise .Name}} != ""{{else if eq .Type "INT64"}}t.{{capitalise .Name}} != 0{{else if eq .Type "BOOL"}}true{{else if eq .Type "NUMERIC"}}t.{{capitalise .Name}} != nil{{else if eq .Type "DECIMAL"}}t.{{capitalise .Name}} != nil{{else if eq .Type "DATE"}}!t.{{capitalise .Name}}.IsZero(){{else if eq .Type "TIMESTAMP"}}!t.{{capitalise .Name}}.IsZero(){{else if eq .Type "LIST"}}len(t.{{capitalise .Name}}) > 0{{else if eq .Type "GENMAP"}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0{{else if eq .Type "MAP"}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0{{else if eq .Type "OPTIONAL"}}t.{{capitalise .Name}} != nil{{else if .IsOptional}}t.{{capitalise .Name}} != nil{{else if .IsEnum}}t.{{capitalise .Name}} != ""{{else}}t.{{capitalise .Name}} != nil{{end}}{{end}}
+  {{/* ✅ Go slices like []BurnMintOutput, []CONTRACT_ID, []PARTY */}}
+  {{- else if stringsHasPrefix .Type "[]" -}}
+    func() []interface{} {
+      res := make([]interface{}, 0, len(t.{{capitalise .Name}}))
+      for _, e := range t.{{capitalise .Name}} {
+        {{$elem := stringsTrimPrefix .Type "[]"}}
+        {{- if eq $elem "PARTY" -}}
+          res = append(res, e.ToMap())
+        {{- else if eq $elem "TEXT" -}}
+          res = append(res, string(e))
+        {{- else if eq $elem "INT64" -}}
+          res = append(res, int64(e))
+        {{- else if eq $elem "BOOL" -}}
+          res = append(res, bool(e))
+        {{- else if eq $elem "CONTRACT_ID" -}}
+          res = append(res, string(e))
+        {{- else if or (eq $elem "NUMERIC") (eq $elem "DECIMAL") -}}
+          res = append(res, (*big.Int)(e))
+        {{- else -}}
+          type mapper interface{ toMap() map[string]interface{} }
+          if m, ok := any(e).(mapper); ok {
+            res = append(res, m.toMap())
+          } else {
+            res = append(res, e)
+          }
+        {{- end -}}
+      }
+      return res
+    }()
+
+  {{- else if eq .Type "LIST" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type "GENMAP" -}}map[string]interface{}{"_type": "genmap", "value": t.{{capitalise .Name}}}
+  {{- else if eq .Type "MAP" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type "OPTIONAL" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type "string" -}}string(t.{{capitalise .Name}})
+ {{- else -}}
+func() interface{} {
+  type mapper interface{ toMap() map[string]interface{} }
+  if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
+    return m.toMap()
+  }
+  return t.{{capitalise .Name}}
+}() 
+  {{- end -}}
+{{- end -}}
+{{end}}
+
+{{define "fieldIsNotEmpty"}}
+{{- if eq .Type "PARTY" -}}t.{{capitalise .Name}} != ""
+{{- else if eq .Type "TEXT" -}}t.{{capitalise .Name}} != ""
+{{- else if eq .Type "INT64" -}}t.{{capitalise .Name}} != 0
+{{- else if eq .Type "BOOL" -}}true
+{{- else if eq .Type "NUMERIC" -}}t.{{capitalise .Name}} != nil
+{{- else if eq .Type "DECIMAL" -}}t.{{capitalise .Name}} != nil
+{{- else if eq .Type "DATE" -}}!t.{{capitalise .Name}}.IsZero()
+{{- else if eq .Type "TIMESTAMP" -}}!t.{{capitalise .Name}}.IsZero()
+{{- else if eq .Type "LIST" -}}len(t.{{capitalise .Name}}) > 0
+{{- else if stringsHasPrefix .Type "[]" -}}len(t.{{capitalise .Name}}) > 0
+{{- else if eq .Type "GENMAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
+{{- else if eq .Type "MAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
+{{- else if eq .Type "OPTIONAL" -}}t.{{capitalise .Name}} != nil
+{{- else if .IsOptional -}}t.{{capitalise .Name}} != nil
+{{- else if .IsEnum -}}t.{{capitalise .Name}} != ""
+{{- else -}}
+func() interface{} {
+  type mapper interface{ toMap() map[string]interface{} }
+  if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
+    return m.toMap()
+  }
+  return t.{{capitalise .Name}}
+}() 
+{{- end -}}
+{{end}}

@@ -79,8 +79,7 @@ func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 			continue
 		}
 
-		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
-		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
+		moduleName := c.getDottedName(&damlLf, module.GetNameInternedDname())
 
 		interfaces, err := c.getInterfaces(&damlLf, module, moduleName)
 		if err != nil {
@@ -125,8 +124,7 @@ func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMa
 			continue
 		}
 
-		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
-		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
+		moduleName := c.getDottedName(&damlLf, module.GetNameInternedDname())
 		log.Info().Msgf("processing module %s", moduleName)
 
 		dataTypes, err := c.getDataTypes(&damlLf, module, moduleName)
@@ -244,7 +242,7 @@ func (c *codeGenAst) getTemplates(
 				if impl.Interface != nil {
 					interfaceName := "I" + c.getName(pkg, impl.Interface.GetNameInternedDname())
 					tmplStruct.Implements = append(tmplStruct.Implements, interfaceName)
-					ifcModuleName := c.getName(pkg, impl.Interface.Module.ModuleNameInternedDname)
+					ifcModuleName := c.getDottedName(pkg, impl.Interface.Module.ModuleNameInternedDname)
 					log.Debug().Msgf("template %s -implements interface: %s location %s", templateName, interfaceName, ifcModuleName)
 
 					if interfaceStruct, exists := interfaces[ifcModuleName][interfaceName]; exists {
@@ -463,6 +461,10 @@ func (c *codeGenAst) parseExpressionForFields(pkg *daml.Package, expr *daml.Expr
 	return fieldNames
 }
 
+func isContractIdTypeName(name string) bool {
+	return name == "ContractId" || name == RawTypeContractID || name == "CONTRACT_ID"
+}
+
 func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
 	if typ == nil {
 		return ""
@@ -476,16 +478,31 @@ func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
 			return "unknown_interned_type"
 		}
 
-		// TODO: add other types here
-		isConType := prim.GetCon()
-		if isConType != nil {
-			tyconName := c.getName(pkg, isConType.Tycon.GetNameInternedDname())
-			fieldType = tyconName
-		} else if builtinType := prim.GetBuiltin(); builtinType != nil {
-			fieldType = c.handleBuiltinType(pkg, builtinType)
-		} else {
-			fieldType = prim.String()
+		switch p := prim.Sum.(type) {
+		case *daml.Type_Tapp:
+			lhs := c.extractType(pkg, p.Tapp.GetLhs())
+			if isContractIdTypeName(lhs) || lhs == "string" {
+				return "string"
+			}
+			// minimal: ignore rhs
+			return model.NormalizeDAMLType(lhs)
 		}
+
+		if con := prim.GetCon(); con != nil {
+			return model.NormalizeDAMLType(c.getName(pkg, con.Tycon.GetNameInternedDname()))
+		}
+		if builtin := prim.GetBuiltin(); builtin != nil {
+			return model.NormalizeDAMLType(c.handleBuiltinType(pkg, builtin))
+		}
+
+		return c.extractType(pkg, prim)
+	case *daml.Type_Tapp:
+		lhs := c.extractType(pkg, v.Tapp.GetLhs())
+		if isContractIdTypeName(lhs) || lhs == "string" {
+			return "string"
+		}
+		return model.NormalizeDAMLType(lhs)
+
 	case *daml.Type_Con_:
 		if v.Con.Tycon != nil {
 			fieldType = c.getName(pkg, v.Con.Tycon.GetNameInternedDname())
@@ -571,7 +588,7 @@ func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) 
 			} else if builtinType := prim.GetBuiltin(); builtinType != nil {
 				fieldType = c.handleBuiltinType(pkg, builtinType)
 			} else {
-				fieldType = prim.String()
+				fieldType = c.extractType(pkg, prim)
 			}
 		} else {
 			fieldType = "complex_interned_type"
@@ -605,4 +622,22 @@ func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) 
 	}
 
 	return fieldName, model.NormalizeDAMLType(fieldType), nil
+}
+
+func (c *codeGenAst) getDottedName(pkg *daml.Package, dottedNameID int32) string {
+	if int(dottedNameID) >= len(pkg.InternedDottedNames) {
+		return ""
+	}
+	segments := pkg.InternedDottedNames[dottedNameID].SegmentsInternedStr
+	if len(segments) == 0 {
+		return ""
+	}
+
+	parts := make([]string, 0, len(segments))
+	for _, segIdx := range segments {
+		if int(segIdx) < len(pkg.InternedStrings) {
+			parts = append(parts, pkg.InternedStrings[segIdx])
+		}
+	}
+	return strings.Join(parts, ".")
 }
