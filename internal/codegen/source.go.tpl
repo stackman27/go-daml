@@ -315,8 +315,8 @@ func {{capitalise $interfaceName}}InterfaceID(packageID *string) string {
           res = append(res, int64(e))
         {{- else if eq $elem "BOOL" -}}
           res = append(res, bool(e))
-        {{- else if eq $elem "CONTRACT_ID" -}}
-          res = append(res, string(e))
+		{{- else if eq $elem "CONTRACT_ID" -}}
+		  res = append(res, e)
         {{- else if or (eq $elem "NUMERIC") (eq $elem "DECIMAL") -}}
           res = append(res, (*big.Int)(e))
         {{- else -}}
