@@ -53,13 +53,14 @@ func parseTemplateID(templateID string) (packageID, moduleName, entityName strin
 
 func commandsToProto(cmd *model.Commands) *v2.Commands {
 	pbCmd := &v2.Commands{
-		WorkflowId:   cmd.WorkflowID,
-		UserId:       cmd.UserID,
-		CommandId:    cmd.CommandID,
-		Commands:     commandsArrayToProto(cmd.Commands),
-		ActAs:        cmd.ActAs,
-		ReadAs:       cmd.ReadAs,
-		SubmissionId: cmd.SubmissionID,
+		WorkflowId:         cmd.WorkflowID,
+		UserId:             cmd.UserID,
+		CommandId:          cmd.CommandID,
+		Commands:           commandsArrayToProto(cmd.Commands),
+		ActAs:              cmd.ActAs,
+		ReadAs:             cmd.ReadAs,
+		SubmissionId:       cmd.SubmissionID,
+		DisclosedContracts: disclosedContractsToProto(cmd.DisclosedContracts),
 	}
 
 	if cmd.MinLedgerTimeAbs != nil {
@@ -492,6 +493,20 @@ func mapToValue(data interface{}) *v2.Value {
 
 	// Handle custom types before other type checking
 	switch v := data.(type) {
+	case types.TEXTMAP:
+		entries := make([]*v2.TextMap_Entry, 0, len(v))
+		for k, val := range v {
+			entries = append(entries, &v2.TextMap_Entry{
+				Key:   k,
+				Value: mapToValue(val),
+			})
+		}
+		return &v2.Value{
+			Sum: &v2.Value_TextMap{
+				TextMap: &v2.TextMap{Entries: entries},
+			},
+		}
+
 	case types.INT64:
 		return &v2.Value{Sum: &v2.Value_Int64{Int64: int64(v)}}
 	case types.TEXT:
@@ -1133,4 +1148,39 @@ func exercisedEventFromProto(pb *v2.ExercisedEvent) *model.ExercisedEvent {
 	}
 
 	return event
+}
+
+func transactionToModel(pb *v2.Transaction) *model.Transaction {
+	if pb == nil {
+		return nil
+	}
+
+	return &model.Transaction{
+		UpdateID:    pb.UpdateId,
+		Offset:      pb.Offset,
+		WorkflowID:  pb.WorkflowId,
+		CommandID:   pb.CommandId,
+		EffectiveAt: protoTimeToPointer(pb.EffectiveAt),
+		Events:      eventsFromProto(pb.Events),
+	}
+}
+
+func protoTimeToPointer(pb *timestamppb.Timestamp) *time.Time {
+	if pb == nil {
+		return nil
+	}
+	t := pb.AsTime()
+	return &t
+}
+
+func eventsFromProto(pb []*v2.Event) []*model.Event {
+	if pb == nil {
+		return nil
+	}
+
+	result := make([]*model.Event, len(pb))
+	for i, event := range pb {
+		result[i] = eventFromProto(event)
+	}
+	return result
 }

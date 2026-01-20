@@ -8,34 +8,28 @@ import (
 )
 
 type (
-	PARTY              string
-	TEXT               string
-	INT64              int64
-	BOOL               bool
-	DECIMAL            *big.Int
-	DATE               time.Time
-	TIMESTAMP          time.Time
-	UNIT               struct{}
-	LIST               []string
-	MAP                map[string]interface{}
-	OPTIONAL           *interface{}
-	GENMAP             map[string]interface{}
-	TEXTMAP            map[string]string
-	CONTRACT_ID        string
-	RELTIME            time.Duration
-	SET                []interface{}
-	TUPLE2[T1, T2 any] struct {
-		First  T1
-		Second T2
-	}
-	TUPLE3[T1, T2, T3 any] struct {
-		First  T1
-		Second T2
-		Third  T3
+	PARTY       string
+	TEXT        string
+	INT64       int64
+	BOOL        bool
+	DECIMAL     *big.Int
+	NUMERIC     *big.Int
+	DATE        time.Time
+	TIMESTAMP   time.Time
+	UNIT        struct{}
+	LIST        []string
+	MAP         map[string]interface{}
+	OPTIONAL    *interface{}
+	GENMAP      map[string]interface{}
+	TEXTMAP     map[string]interface{}
+	CONTRACT_ID string
+	RELTIME     time.Duration
+	SET         []interface{}
+	TUPLE2      struct {
+		First  interface{}
+		Second interface{}
 	}
 )
-
-type NUMERIC *big.Int
 
 func NewNumericFromDecimal(d decimal.Decimal) NUMERIC {
 	return NUMERIC(d.Shift(10).BigInt())

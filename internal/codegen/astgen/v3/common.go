@@ -79,8 +79,7 @@ func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 			continue
 		}
 
-		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
-		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
+		moduleName := c.getDottedName(&damlLf, module.GetNameInternedDname())
 
 		interfaces, err := c.getInterfaces(&damlLf, module, moduleName)
 		if err != nil {
@@ -125,8 +124,7 @@ func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMa
 			continue
 		}
 
-		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
-		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
+		moduleName := c.getDottedName(&damlLf, module.GetNameInternedDname())
 		log.Info().Msgf("processing module %s", moduleName)
 
 		dataTypes, err := c.getDataTypes(&damlLf, module, moduleName)
@@ -244,7 +242,7 @@ func (c *codeGenAst) getTemplates(
 				if impl.Interface != nil {
 					interfaceName := "I" + c.getName(pkg, impl.Interface.GetNameInternedDname())
 					tmplStruct.Implements = append(tmplStruct.Implements, interfaceName)
-					ifcModuleName := c.getName(pkg, impl.Interface.Module.ModuleNameInternedDname)
+					ifcModuleName := c.getDottedName(pkg, impl.Interface.Module.ModuleNameInternedDname)
 					log.Debug().Msgf("template %s -implements interface: %s location %s", templateName, interfaceName, ifcModuleName)
 
 					if interfaceStruct, exists := interfaces[ifcModuleName][interfaceName]; exists {
@@ -463,74 +461,107 @@ func (c *codeGenAst) parseExpressionForFields(pkg *daml.Package, expr *daml.Expr
 	return fieldNames
 }
 
+func (c *codeGenAst) extractTapp(pkg *daml.Package, tapp *daml.Type_TApp) string {
+	if tapp == nil {
+		return "unknown_tapp"
+	}
+
+	lhs := model.NormalizeDAMLType(c.extractType(pkg, tapp.GetLhs()))
+
+	switch lhs {
+	case "LIST":
+		elem := model.NormalizeDAMLType(c.extractType(pkg, tapp.GetRhs()))
+		return "[]" + elem
+
+	case "OPTIONAL":
+		elem := model.NormalizeDAMLType(c.extractType(pkg, tapp.GetRhs()))
+		return "*" + elem
+
+	case "CONTRACT_ID":
+		// ContractId X  -> CONTRACT_ID (don’t collapse to string)
+		return "CONTRACT_ID"
+	}
+
+	// some other type application; keep lhs
+	return lhs
+}
 func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
 	if typ == nil {
 		return ""
 	}
 
-	var fieldType string
 	switch v := typ.Sum.(type) {
+
 	case *daml.Type_InternedType:
 		prim := pkg.InternedTypes[v.InternedType]
 		if prim == nil {
 			return "unknown_interned_type"
 		}
+		// recurse into the interned definition (may be TApp/Builtin/Con/etc)
+		return model.NormalizeDAMLType(c.extractType(pkg, prim))
 
-		isConType := prim.GetCon()
-		if isConType != nil {
-			fieldType = c.handleConType(pkg, isConType)
-		} else if builtinType := prim.GetBuiltin(); builtinType != nil {
-			fieldType = c.handleBuiltinType(pkg, builtinType)
-		} else {
-			fieldType = prim.String()
-		}
+	case *daml.Type_Tapp: // ✅ MUST be Type_Tapp? nope -> Type_Tapp is wrong; you want Type_Tapp? actually the oneof wrapper is Type_Tapp, but the inner is Type_TApp
+		// IMPORTANT: depending on generated code, wrapper is Type_Tapp but inner is Type_TApp.
+		// In your earlier error, v.Tapp is *Type_TApp, so this compiles.
+		return model.NormalizeDAMLType(c.extractTapp(pkg, v.Tapp))
+
+	case *daml.Type_Builtin_:
+		return model.NormalizeDAMLType(c.handleBuiltinType(pkg, v.Builtin))
+
 	case *daml.Type_Con_:
-		fieldType = c.handleConType(pkg, v.Con)
+		if v.Con.Tycon != nil {
+			return model.NormalizeDAMLType(c.getName(pkg, v.Con.Tycon.GetNameInternedDname()))
+		}
+		return "con_without_tycon"
+
 	case *daml.Type_Var_:
 		if int(v.Var.GetVarInternedStr()) < len(pkg.InternedStrings) {
-			fieldType = pkg.InternedStrings[v.Var.GetVarInternedStr()]
-		} else {
-			fieldType = "unknown_var"
+			return model.NormalizeDAMLType(pkg.InternedStrings[v.Var.GetVarInternedStr()])
 		}
+		return "unknown_var"
+
 	case *daml.Type_Syn_:
 		if v.Syn.Tysyn != nil {
-			fieldType = fmt.Sprintf("syn_%s", c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname()))
-		} else {
-			fieldType = "syn_without_name"
+			return model.NormalizeDAMLType(fmt.Sprintf("syn_%s", c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname())))
 		}
-	default:
-		fieldType = fmt.Sprintf("unknown_type_%T", typ.Sum)
-	}
+		return "syn_without_name"
 
-	return model.NormalizeDAMLType(fieldType)
+	default:
+		return model.NormalizeDAMLType(fmt.Sprintf("unknown_type_%T", typ.Sum))
+	}
 }
 
-func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, builtinType *daml.Type_Builtin) string {
-	builtinName := builtinType.Builtin.String()
+func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, b *daml.Type_Builtin) string {
+	switch b.Builtin {
 
-	switch builtinType.Builtin {
 	case daml.BuiltinType_LIST:
-		if len(builtinType.Args) > 0 {
-			elementType := c.extractType(pkg, builtinType.Args[0])
-			normalizedElementType := model.NormalizeDAMLType(elementType)
-			return "[]" + normalizedElementType
+		// LIST a
+		if len(b.Args) > 0 {
+			elem := model.NormalizeDAMLType(c.extractType(pkg, b.Args[0]))
+			return "[]" + elem
 		}
-		return RawTypeList
+		return RawTypeList // fallback
+
 	case daml.BuiltinType_OPTIONAL:
-		if len(builtinType.Args) > 0 {
-			elementType := c.extractType(pkg, builtinType.Args[0])
-			normalizedElementType := model.NormalizeDAMLType(elementType)
-			return "*" + normalizedElementType
+		// Optional a
+		if len(b.Args) > 0 {
+			elem := model.NormalizeDAMLType(c.extractType(pkg, b.Args[0]))
+			return "*" + elem
 		}
 		return RawTypeOptional
+
+	case daml.BuiltinType_CONTRACT_ID:
+		// ContractId a  -> CONTRACT_ID (do not collapse to string)
+		return RawTypeContractID
+
 	case daml.BuiltinType_GENMAP:
 		return "GENMAP"
+
 	case daml.BuiltinType_TEXTMAP:
 		return "TEXTMAP"
-	case daml.BuiltinType_CONTRACT_ID:
-		return RawTypeContractID
+
 	default:
-		return builtinName
+		return b.Builtin.String()
 	}
 }
 
@@ -581,58 +612,34 @@ func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) 
 		return "", "", fmt.Errorf("field is nil")
 	}
 
-	internedStrIdx := field.GetFieldInternedStr()
-	if int(internedStrIdx) >= len(pkg.InternedStrings) {
-		return "", "", fmt.Errorf("invalid interned string index for field name: %d", internedStrIdx)
+	idx := field.GetFieldInternedStr()
+	if int(idx) >= len(pkg.InternedStrings) {
+		return "", "", fmt.Errorf("invalid interned string index for field name: %d", idx)
 	}
-	fieldName := pkg.InternedStrings[internedStrIdx]
+	fieldName := pkg.InternedStrings[idx]
+
 	if field.Type == nil {
 		return fieldName, "", fmt.Errorf("field type is nil")
 	}
 
-	//	*Type_Var_
-	//	*Type_Con_
-	//	*Type_Syn_
-	//	*Type_Interned
-	var fieldType string
-	switch v := field.Type.Sum.(type) {
-	case *daml.Type_InternedType:
-		prim := pkg.InternedTypes[v.InternedType]
-		if prim != nil {
-			isConType := prim.GetCon()
-			if isConType != nil {
-				fieldType = c.handleConType(pkg, isConType)
-			} else if builtinType := prim.GetBuiltin(); builtinType != nil {
-				fieldType = c.handleBuiltinType(pkg, builtinType)
-			} else {
-				fieldType = prim.String()
-			}
-		} else {
-			fieldType = "complex_interned_type"
-		}
-	case *daml.Type_Con_:
-		fieldType = c.handleConType(pkg, v.Con)
-	case *daml.Type_Var_:
-		switch {
-		case v.Var.GetVarInternedStr() != 0:
-			// For variables, we use the interned string directly, not getName which expects DottedName
-			if int(v.Var.GetVarInternedStr()) < len(pkg.InternedStrings) {
-				fieldType = pkg.InternedStrings[v.Var.GetVarInternedStr()]
-			} else {
-				fieldType = "unknown_var"
-			}
-		default:
-			fieldType = "unnamed_var"
-		}
-	case *daml.Type_Syn_:
-		if v.Syn.Tysyn != nil {
-			fieldType = fmt.Sprintf("syn_%s", c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname()))
-		} else {
-			fieldType = "syn_without_name"
-		}
-	default:
-		return fieldName, "", fmt.Errorf("unsupported type sum: %T", field.Type.Sum)
+	ty := c.extractType(pkg, field.Type) // ✅ funnels everything through tapp/builtin/etc
+	return fieldName, model.NormalizeDAMLType(ty), nil
+}
+
+func (c *codeGenAst) getDottedName(pkg *daml.Package, dottedNameID int32) string {
+	if int(dottedNameID) >= len(pkg.InternedDottedNames) {
+		return ""
+	}
+	segments := pkg.InternedDottedNames[dottedNameID].SegmentsInternedStr
+	if len(segments) == 0 {
+		return ""
 	}
 
-	return fieldName, model.NormalizeDAMLType(fieldType), nil
+	parts := make([]string, 0, len(segments))
+	for _, segIdx := range segments {
+		if int(segIdx) < len(pkg.InternedStrings) {
+			parts = append(parts, pkg.InternedStrings[segIdx])
+		}
+	}
+	return strings.Join(parts, ".")
 }

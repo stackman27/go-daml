@@ -16,6 +16,7 @@ type Commands struct {
 	ActAs               []string
 	ReadAs              []string
 	SubmissionID        string
+	DisclosedContracts  []*DisclosedContract
 }
 
 type DeduplicationPeriod interface {
@@ -127,6 +128,12 @@ type SubmitAndWaitRequest struct {
 type SubmitAndWaitResponse struct {
 	UpdateID         string
 	CompletionOffset int64
+}
+
+type SubmitAndWaitForTransactionResponse struct {
+	UpdateID         string
+	CompletionOffset int64
+	Transaction      *Transaction
 }
 
 // Event Query Service types
