@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -155,9 +156,13 @@ func GetManifest(srcPath string) (*model.Manifest, error) {
 }
 
 func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, dalfManifest *model.Manifest) (map[string]string, error) {
+	//  ensure stable processing order across runs
+	sort.Strings(dalfToProcess)
+
 	ifcByModule := make(map[string]model.InterfaceMap)
 	result := make(map[string]string)
 
+	// -------- 1) INTERFACES: deterministic traversal, no renaming logic change --------
 	for _, dalf := range dalfToProcess {
 		dalfFullPath := filepath.Join(unzippedPath, dalf)
 		dalfContent, err := os.ReadFile(dalfFullPath)
@@ -172,7 +177,16 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 			continue
 		}
 
-		for key, val := range interfaces {
+		//  iterate interfaces deterministically
+		keys := make([]string, 0, len(interfaces))
+		for k := range interfaces {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			val := interfaces[key]
+
 			equalNames := 0
 			for _, ifcName := range ifcByModule {
 				for ifcKey := range ifcName {
@@ -185,7 +199,8 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 			}
 			if equalNames > 0 {
 				equalNames++
-				val.Name = fmt.Sprintf("%s%d", key, equalNames)
+				val.Name = fmt.Sprintf("%s%d", key, equalNames) // keep your existing suffix scheme
+				// If you also want to avoid "...22" visually, change to: fmt.Sprintf("%s_%d", key, equalNames)
 			}
 
 			m, ok := ifcByModule[val.ModuleName]
@@ -197,6 +212,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 		}
 	}
 
+	// -------- 2) STRUCTS: deterministic traversal + do not mutate map while ranging --------
 	allStructNames := make(map[string]int)
 
 	for _, dalf := range dalfToProcess {
@@ -220,18 +236,49 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 		}
 
 		log.Info().Msgf("adding interfaces for dalf %s from modules: %v", dalf, currentModules)
-		for moduleName := range currentModules {
+
+		//  iterate modules deterministically
+		moduleNames := make([]string, 0, len(currentModules))
+		for m := range currentModules {
+			moduleNames = append(moduleNames, m)
+		}
+		sort.Strings(moduleNames)
+
+		for _, moduleName := range moduleNames {
 			if ifcMap, exists := ifcByModule[moduleName]; exists {
-				for key, val := range ifcMap {
+				//  iterate interfaces deterministically
+				ifcKeys := make([]string, 0, len(ifcMap))
+				for k := range ifcMap {
+					ifcKeys = append(ifcKeys, k)
+				}
+				sort.Strings(ifcKeys)
+
+				for _, key := range ifcKeys {
+					val := ifcMap[key]
 					log.Debug().Msgf("adding interface %s from module %s to output", key, moduleName)
 					pkg.Structs[key] = val
 				}
 			}
 		}
 
+		//  deterministic renaming (plan + apply)
+		type rename struct {
+			orig string
+			new  string
+			def  *model.TmplStruct
+		}
+		planned := make([]rename, 0)
 		renamedStructs := make(map[string]*model.TmplStruct)
 
-		for structName, structDef := range pkg.Structs {
+		//  iterate struct keys deterministically
+		structKeys := make([]string, 0, len(pkg.Structs))
+		for k := range pkg.Structs {
+			structKeys = append(structKeys, k)
+		}
+		sort.Strings(structKeys)
+
+		for _, structName := range structKeys {
+			structDef := pkg.Structs[structName]
 			if structDef.IsInterface {
 				continue
 			}
@@ -247,19 +294,23 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 
 			if equalNames > 0 {
 				equalNames++
-				originalName := structName
-				newName := fmt.Sprintf("%s%d", structName, equalNames)
-				structDef.Name = newName
-
-				delete(pkg.Structs, originalName)
-				pkg.Structs[newName] = structDef
-				renamedStructs[originalName] = structDef
-				allStructNames[newName] = equalNames
+				newName := fmt.Sprintf("%s%d", structName, equalNames) // keep your existing suffix scheme
+				// If you also want to avoid "...22" visually, change to: fmt.Sprintf("%s_%d", structName, equalNames)
+				planned = append(planned, rename{orig: structName, new: newName, def: structDef})
 			} else {
 				allStructNames[structName] = 0
 			}
 		}
 
+		for _, r := range planned {
+			r.def.Name = r.new
+			delete(pkg.Structs, r.orig)
+			pkg.Structs[r.new] = r.def
+			renamedStructs[r.orig] = r.def
+			allStructNames[r.new] = 1
+		}
+
+		// Update references (unchanged)
 		for _, structDef := range pkg.Structs {
 			for _, field := range structDef.Fields {
 				if renamed, exists := renamedStructs[field.Type]; exists {
@@ -289,6 +340,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 
 		result[dalf] = code
 	}
+
 	return result, nil
 }
 
@@ -324,8 +376,7 @@ func GetAST(payload []byte, manifest *model.Manifest, ifcByModule map[string]mod
 	if err != nil {
 		return nil, err
 	}
-	var structs map[string]*model.TmplStruct
-	structs, err = gen.GetTemplateStructs(ifcByModule)
+	structs, err := gen.GetTemplateStructs(ifcByModule)
 	if err != nil {
 		return nil, err
 	}
@@ -334,11 +385,6 @@ func GetAST(payload []byte, manifest *model.Manifest, ifcByModule map[string]mod
 	if packageID == "" {
 		return nil, fmt.Errorf("could not extract package ID from MainDalf: %s", manifest.MainDalf)
 	}
-
-	// packageName := manifest.Name
-	// if packageName == "" {
-	// 	packageName = getPackageName(manifest.MainDalf)
-	// }
 
 	return &model.Package{
 		PackageID: packageID,
