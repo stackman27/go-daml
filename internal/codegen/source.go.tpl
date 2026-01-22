@@ -183,9 +183,9 @@ func argsToMap(args interface{}) map[string]interface{} {
 {{if eq .RawType "Variant"}}
 // {{capitalise .Name}} is a variant/union type
 type {{capitalise .Name}} struct {
-	{{range $field := .Fields}}
+{{- range $field := .Fields}}
 	{{capitalise $field.Name}} *{{$field.Type}} `json:"{{$field.Name}},omitempty"`
-	{{end}}
+{{- end}}
 }
 
 // MarshalJSON implements custom JSON marshaling for {{capitalise .Name}}
