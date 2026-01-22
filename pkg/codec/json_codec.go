@@ -294,9 +294,13 @@ func (codec *JsonCodec) genMapToDynamicValue(gm types.GENMAP) (interface{}, erro
 }
 
 func (codec *JsonCodec) textMapToDynamicValue(tm types.TEXTMAP) (interface{}, error) {
-	result := make(map[string]string)
+	result := make(map[string]interface{}, len(tm))
 	for k, v := range tm {
-		result[k] = v
+		converted, err := codec.toDynamicValue(v)
+		if err != nil {
+			return nil, err
+		}
+		result[k] = converted
 	}
 	return result, nil
 }

@@ -580,10 +580,23 @@ func mapToValue(data interface{}) *v2.Value {
 		}
 
 		if typeStr, ok := v["_type"].(string); ok && typeStr == "textmap" {
-			if mapValue, ok := v["value"].(map[string]string); ok {
-				return getTextMapConvert(mapValue)
-			} else if textMapValue, ok := v["value"].(types.TEXTMAP); ok {
-				return getTextMapConvert(textMapValue)
+			switch mv := v["value"].(type) {
+			case map[string]interface{}:
+				return getTextMapConvert(mv)
+			case map[string]string:
+				// promote to map[string]interface{}
+				tmp := make(map[string]interface{}, len(mv))
+				for k, val := range mv {
+					tmp[k] = val
+				}
+				return getTextMapConvert(tmp)
+			case types.TEXTMAP:
+				// TEXTMAP is a map-like alias; convert it
+				tmp := make(map[string]interface{}, len(mv))
+				for k, val := range mv {
+					tmp[k] = val
+				}
+				return getTextMapConvert(tmp)
 			}
 		}
 
@@ -663,12 +676,12 @@ func getMapConvert(genMapValue map[string]interface{}) *v2.Value {
 	}
 }
 
-func getTextMapConvert(values map[string]string) *v2.Value {
+func getTextMapConvert(values map[string]interface{}) *v2.Value {
 	entries := make([]*v2.TextMap_Entry, 0, len(values))
 	for key, val := range values {
 		entries = append(entries, &v2.TextMap_Entry{
 			Key:   key,
-			Value: &v2.Value{Sum: &v2.Value_Text{Text: val}},
+			Value: mapToValue(val),
 		})
 	}
 	return &v2.Value{
