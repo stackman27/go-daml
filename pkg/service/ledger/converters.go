@@ -408,6 +408,52 @@ func valueFromProto(pb *v2.Value) interface{} {
 	}
 }
 
+func normalizeLedgerNumericLiteral(s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", false
+	}
+	// allow printers that emit "123."
+	if strings.HasSuffix(s, ".") {
+		s = strings.TrimSuffix(s, ".")
+		if s == "" || s == "-" {
+			return "", false
+		}
+	}
+
+	dot := false
+	for i, ch := range s {
+		if ch == '-' {
+			if i != 0 {
+				return "", false
+			}
+			continue
+		}
+		if ch == '.' {
+			if dot {
+				return "", false
+			}
+			dot = true
+			continue
+		}
+		if ch < '0' || ch > '9' {
+			return "", false
+		}
+	}
+
+	// Clean: strip ".0000..." => integer
+	if dot {
+		parts := strings.SplitN(s, ".", 2)
+		frac := strings.TrimRight(parts[1], "0")
+		if frac == "" {
+			return parts[0], true
+		}
+		return parts[0] + "." + frac, true
+	}
+
+	return s, true
+}
+
 func mapToValue(data interface{}) *v2.Value {
 	if data == nil {
 		return nil
@@ -415,6 +461,14 @@ func mapToValue(data interface{}) *v2.Value {
 
 	// handle custom pointer types first before dereferencing
 	switch v := data.(type) {
+	case types.NUMERIC_STR:
+		s, ok := normalizeLedgerNumericLiteral(string(v))
+		if !ok {
+			log.Warn().Msgf("invalid NumericLiteral %q", string(v))
+			return nil
+		}
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}}
+
 	case decimal.Decimal:
 		scaled := types.NewNumericFromDecimal(v)
 		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(scaled), 10).FloatString(10)}}

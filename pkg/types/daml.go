@@ -14,6 +14,7 @@ type (
 	BOOL        bool
 	DECIMAL     *big.Int
 	NUMERIC     *big.Int
+	NUMERIC_STR string
 	DATE        time.Time
 	TIMESTAMP   time.Time
 	UNIT        struct{}
