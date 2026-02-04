@@ -307,7 +307,7 @@ func (t {{capitalise .Name}}) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t {{capitalise .Name}}) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "{{.ModuleName}}", "{{capitalise .Name}}")
+	return fmt.Sprintf("%s:%s:%s", packageID, "{{.ModuleName}}", "{{capitalise .Name}}")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -477,7 +477,7 @@ func {{capitalise $interfaceName}}InterfaceID() string {
 
 // {{capitalise $interfaceName}}InterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func {{capitalise $interfaceName}}InterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "{{$moduleName}}", "{{capitalise $damlName}}")
+	return fmt.Sprintf("%s:%s:%s", packageID, "{{$moduleName}}", "{{capitalise $damlName}}")
 }
 {{end}}
 {{end}}
