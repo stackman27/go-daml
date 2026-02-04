@@ -477,7 +477,7 @@ func {{capitalise $interfaceName}}InterfaceID() string {
 
 // {{capitalise $interfaceName}}InterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func {{capitalise $interfaceName}}InterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "{{$moduleName}}", "{{capitalise $damlName}}")
+	return fmt.Sprintf("%s:%s:%s", packageID, "{{$moduleName}}", "{{capitalise $damlName}}")
 }
 {{end}}
 {{end}}
