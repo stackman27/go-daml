@@ -51,17 +51,32 @@ func isTuple3(v reflect.Value) bool {
 
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
 	// Template ID format: #package-name:module:entity or #package-hash:module:entity
-	// The # is always part of the identifier and must be included in PackageId field
-	// for both package names and package hashes
 	trimmed := strings.TrimPrefix(templateID, "#")
 	parts := strings.Split(trimmed, ":")
 	if len(parts) == 3 {
-		pkgID := "#" + parts[0]
+		pkgID := parts[0]
+		// If it's a package name (not a 64-char hex hash), add # prefix as it's part of the identifier
+		if !isPackageHash(pkgID) {
+			pkgID = "#" + pkgID
+		}
 		return pkgID, parts[1], parts[2]
 	} else if len(parts) == 2 {
 		return "", parts[0], parts[1]
 	}
 	return "", "", templateID
+}
+
+// isPackageHash checks if a string is a 64-character hexadecimal hash (package ID)
+func isPackageHash(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for _, ch := range s {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 func commandsToProto(cmd *model.Commands) *v2.Commands {
